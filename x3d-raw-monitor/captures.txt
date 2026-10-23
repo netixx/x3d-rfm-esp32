@@ -1,72 +1,81 @@
-I (125495) RFM: 13 ff f2 00 2d 75 cc ef 08 41 82 00 20 00 00 fc
-I (125495) RFM: e5 dc 9a
-I (125515) RFM: 13 ff f2 00 2d 75 cc ef 08 41 82 00 20 00 00 fc
-I (125515) RFM: e5 dc 9a
-I (125535) RFM: 13 ff f2 00 2d 75 cc ef 08 41 82 00 20 00 00 fc
-I (125535) RFM: e5 dc 9a
-I (129505) RFM: 13 ff f2 00 2d 75 cc ef 08 41 82 00 20 00 00 fc
-I (129505) RFM: e5 dc 9a
-I (129515) RFM: 13 ff f2 00 2d 75 cc ef 08 41 82 00 20 00 00 fc
-I (129515) RFM: e5 dc 9a
-I (129535) RFM: 13 ff f2 00 2d 75 cc ef 08 41 82 00 20 00 00 fc
-I (129535) RFM: e5 dc 9a
-I (136905) RFM: 13 ff f3 00 2d 75 cc ef 08 41 82 00 20 00 00 fc
-I (136905) RFM: e5 72 66
-I (136925) RFM: 13 ff f3 00 2d 75 cc ef 08 41 82 00 20 00 00 fc
-I (136925) RFM: e5 72 66
-I (136945) RFM: 13 ff f3 00 2d 75 cc ef 08 41 82 00 20 00 00 fc
-I (136945) RFM: e5 72 66
-I (140405) RFM: 13 ff f3 00 2d 75 cc ef 08 41 82 00 20 00 00 fc
-I (140405) RFM: e5 72 66
-I (140425) RFM: 13 ff f3 00 2d 75 cc ef 08 41 82 00 20 00 00 fc
-I (140425) RFM: e5 72 66
-I (140445) RFM: 13 ff f3 00 2d 75 cc ef 08 41 82 00 20 00 00 fc
-I (140445) RFM: e5 72 66
-I (151855) RFM: 13 ff 37 00 2d 55 a0 ef 00 00 82 00 40 00 00 fd
-I (151855) RFM: 5a 00 2c
-I (151875) RFM: 13 ff 37 00 2d 55 a0 ef 00 00 82 00 40 00 00 fd
-I (151875) RFM: 5a 00 2c
-I (151895) RFM: 13 ff 37 00 2d 55 a0 ef 00 00 82 00 40 00 00 fd
-I (151895) RFM: 5a 00 2c
-I (166995) RFM: 13 ff f4 00 2d 75 cc ef 08 41 82 00 20 00 00 fc
-I (166995) RFM: e5 0a f1
-I (167005) RFM: 13 ff f4 00 2d 75 cc ef 08 41 82 00 20 00 00 fc
-I (167005) RFM: e5 0a f1
-I (167025) RFM: 13 ff f4 00 2d 75 cc ef 08 41 82 00 20 00 00 fc
-I (167025) RFM: e5 0a f1
-I (169845) RFM: 13 ff f5 00 2d 75 cc ef 00 01 82 00 20 00 00 fd
-I (169845) RFM: 2d 10 57
-I (169855) RFM: 13 ff f5 00 2d 75 cc ef 00 01 82 00 20 00 00 fd
-I (169855) RFM: 2d 10 57
-I (169875) RFM: 13 ff f5 00 2d 75 cc ef 00 01 82 00 20 00 00 fd
-I (169875) RFM: 2d 10 57
-I (173345) RFM: 13 ff f5 00 2d 75 cc ef 00 01 82 00 20 00 00 fd
-I (173345) RFM: 2d 10 57
-I (173365) RFM: 13 ff f5 00 2d 75 cc ef 00 01 82 00 20 00 00 fd
-I (173365) RFM: 2d 10 57
-I (173375) RFM: 13 ff f5 00 2d 75 cc ef 00 01 82 00 20 00 00 fd
-I (173375) RFM: 2d 10 57
-I (188375) RFM: 13 ff 38 00 2d 55 a0 ef 04 41 82 00 40 00 00 fd
-I (188375) RFM: 15 cb 39
-I (188395) RFM: 13 ff 38 00 2d 55 a0 ef 04 41 82 00 40 00 00 fd
-I (188395) RFM: 15 cb 39
-I (188415) RFM: 13 ff 38 00 2d 55 a0 ef 04 41 82 00 40 00 00 fd
-I (188415) RFM: 15 cb 39
-I (193625) RFM: 13 ff 38 00 2d 55 a0 ef 04 41 82 00 40 00 00 fd
-I (193625) RFM: 15 cb 39
-I (193645) RFM: 13 ff 38 00 2d 55 a0 ef 04 41 82 00 40 00 00 fd
-I (193645) RFM: 15 cb 39
-I (193665) RFM: 13 ff 38 00 2d 55 a0 ef 04 41 82 00 40 00 00 fd
-I (193665) RFM: 15 cb 39
-I (205635) RFM: 13 ff 39 00 2d 55 a0 ef 00 01 82 00 40 00 00 fd
-I (205635) RFM: 59 86 b2
-I (205655) RFM: 13 ff 39 00 2d 55 a0 ef 00 01 82 00 40 00 00 fd
-I (205655) RFM: 59 86 b2
-I (205675) RFM: 13 ff 39 00 2d 55 a0 ef 00 01 82 00 40 00 00 fd
-I (205675) RFM: 59 86 b2
-I (209145) RFM: 13 ff 39 00 2d 55 a0 ef 00 01 82 00 40 00 00 fd
-I (209145) RFM: 59 86 b2
-I (209155) RFM: 13 ff 39 00 2d 55 a0 ef 00 01 82 00 40 00 00 fd
-I (209155) RFM: 59 86 b2
-I (209175) RFM: 13 ff 39 00 2d 55 a0 ef 00 01 82 00 40 00 00 fd
-I (209175) RFM: 59 86 b2
+I (81905) RFM: 13 ff 53 00 2d 85 cc ef 08 41 82 00 20 00 00 fc
+I (81905) RFM: d5 a3 22
+I (81915) RFM: 13 ff 53 00 2d 85 cc ef 08 41 82 00 20 00 00 fc
+I (81915) RFM: d5 a3 22
+I (81935) RFM: 13 ff 53 00 2d 85 cc ef 08 41 82 00 20 00 00 fc
+I (81935) RFM: d5 a3 22
+I (86405) RFM: 13 ff 53 00 2d 85 cc ef 08 41 82 00 20 00 00 fc
+I (86405) RFM: d5 a3 22
+I (86425) RFM: 13 ff 53 00 2d 85 cc ef 08 41 82 00 20 00 00 fc
+I (86425) RFM: d5 a3 22
+I (86445) RFM: 13 ff 53 00 2d 85 cc ef 08 41 82 00 20 00 00 fc
+I (86445) RFM: d5 a3 22
+closed and locked
+I (87515) RFM: 13 ff 54 00 2d 85 cc ef 00 01 82 00 20 00 00 fd
+I (87515) RFM: 1d 6f ef
+I (87525) RFM: 13 ff 54 00 2d 85 cc ef 00 01 82 00 20 00 00 fd
+I (87525) RFM: 1d 6f ef
+I (87545) RFM: 13 ff 54 00 2d 85 cc ef 00 01 82 00 20 00 00 fd
+I (87545) RFM: 1d 6f ef
+I (92765) RFM: 13 ff 54 00 2d 85 cc ef 00 01 82 00 20 00 00 fd
+I (92765) RFM: 1d 6f ef
+I (92785) RFM: 13 ff 54 00 2d 85 cc ef 00 01 82 00 20 00 00 fd
+I (92785) RFM: 1d 6f ef
+I (92805) RFM: 13 ff 54 00 2d 85 cc ef 00 01 82 00 20 00 00 fd
+I (92805) RFM: 1d 6f ef
+closed and unlocked
+I (137165) RFM: 13 ff 55 00 2d 85 cc ef 08 41 82 00 20 00 00 fc
+I (137165) RFM: d5 75 49
+I (137185) RFM: 13 ff 55 00 2d 85 cc ef 08 41 82 00 20 00 00 fc
+I (137185) RFM: d5 75 49
+I (137205) RFM: 13 ff 55 00 2d 85 cc ef 08 41 82 00 20 00 00 fc
+I (137205) RFM: d5 75 49
+I (142175) RFM: 13 ff 55 00 2d 85 cc ef 08 41 82 00 20 00 00 fc
+I (142175) RFM: d5 75 49
+I (142185) RFM: 13 ff 55 00 2d 85 cc ef 08 41 82 00 20 00 00 fc
+I (142185) RFM: d5 75 49
+I (142205) RFM: 13 ff 55 00 2d 85 cc ef 08 41 82 00 20 00 00 fc
+I (142205) RFM: d5 75 49
+nothing for open
+85 cc ef => souflet
+
+2d 0b a0 => sliding door
+closed and locked
+I (599585) RFM: 13 ff 06 00 2d 0b a0 ef 00 01 82 00 40 00 00 fd
+I (599585) RFM: a3 be 2d
+I (599605) RFM: 13 ff 06 00 2d 0b a0 ef 00 01 82 00 40 00 00 fd
+I (599605) RFM: a3 be 2d
+I (599625) RFM: 13 ff 06 00 2d 0b a0 ef 00 01 82 00 40 00 00 fd
+I (599625) RFM: a3 be 2d
+I (604845) RFM: 13 ff 06 00 2d 0b a0 ef 00 01 82 00 40 00 00 fd
+I (604845) RFM: a3 be 2d
+I (604855) RFM: 13 ff 06 00 2d 0b a0 ef 00 01 82 00 40 00 00 fd
+I (604855) RFM: a3 be 2d
+I (604875) RFM: 13 ff 06 00 2d 0b a0 ef 00 01 82 00 40 00 00 fd
+I (604875) RFM: a3 be 2d
+closed and unlocked
+I (647435) RFM: 13 ff 07 00 2d 0b a0 ef 04 41 82 00 40 00 00 fd
+I (647435) RFM: 5f 54 7d
+I (647455) RFM: 13 ff 07 00 2d 0b a0 ef 04 41 82 00 40 00 00 fd
+I (647455) RFM: 5f 54 7d
+I (647475) RFM: 13 ff 07 00 2d 0b a0 ef 04 41 82 00 40 00 00 fd
+I (647475) RFM: 5f 54 7d
+I (651195) RFM: 13 ff 07 00 2d 0b a0 ef 04 41 82 00 40 00 00 fd
+I (651195) RFM: 5f 54 7d
+I (651215) RFM: 13 ff 07 00 2d 0b a0 ef 04 41 82 00 40 00 00 fd
+I (651215) RFM: 5f 54 7d
+I (651225) RFM: 13 ff 07 00 2d 0b a0 ef 04 41 82 00 40 00 00 fd
+I (651225) RFM: 5f 54 7d
+closed and locked
+I (713325) RFM: 13 ff 08 00 2d 0b a0 ef 00 01 82 00 40 00 00 fd
+I (713325) RFM: a3 4f 03
+I (713345) RFM: 13 ff 08 00 2d 0b a0 ef 00 01 82 00 40 00 00 fd
+I (713345) RFM: a3 4f 03
+I (713355) RFM: 13 ff 08 00 2d 0b a0 ef 00 01 82 00 40 00 00 fd
+I (713355) RFM: a3 4f 03
+I (718325) RFM: 13 ff 08 00 2d 0b a0 ef 00 01 82 00 40 00 00 fd
+I (718325) RFM: a3 4f 03
+I (718345) RFM: 13 ff 08 00 2d 0b a0 ef 00 01 82 00 40 00 00 fd
+I (718345) RFM: a3 4f 03
+I (718365) RFM: 13 ff 08 00 2d 0b a0 ef 00 01 82 00 40 00 00 fd
+I (718365) RFM: a3 4f 03
