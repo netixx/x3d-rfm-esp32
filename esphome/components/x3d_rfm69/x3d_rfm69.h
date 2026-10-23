@@ -65,7 +65,7 @@ class X3DRFM69 : public Component,
   void set_log_unclaimed_devices(bool log) { this->log_unclaimed_devices_ = log; }
   void set_log_raw_frames(bool log) { this->log_raw_frames_ = log; }
 
-  void add_opening(X3DOpening *window) { this->openings_.push_back(window); }
+  void add_opening(X3DOpening *opening) { this->openings_.push_back(opening); }
   /// Hub-wide text sensor showing the last event of any device (discovery).
   void set_last_frame_sensor(text_sensor::TextSensor *sensor) { this->last_frame_ = sensor; }
   /// (device_id hex string, state, tilted, kind, rssi, raw frame hex), once per new event of any device.

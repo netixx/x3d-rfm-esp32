@@ -143,7 +143,7 @@ bool has_unexpected_bits(const SensorFrame &frame) {
   if (frame.extra_len != sizeof(KNOWN_EXTRA[0]))
     return true;
   for (const auto &known : KNOWN_EXTRA) {
-    if (memcmp(frame.extra, known, sizeof(known)) == 0)
+    if (std::memcmp(frame.extra, known, sizeof(known)) == 0)
       return false;
   }
   return true;

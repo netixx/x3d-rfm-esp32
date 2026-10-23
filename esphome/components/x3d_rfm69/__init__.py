@@ -150,7 +150,7 @@ CONFIG_SCHEMA = (
             cv.Optional(CONF_OPENINGS, default=[]): cv.All(
                 cv.ensure_list(OPENING_SCHEMA), _unique_device_ids
             ),
-            # Last event of any device, claimed or not: "EFCC85 'Tilt window': unlocked (...)"
+            # Last event of any device, claimed or not: "0xEFCC85 'Tilt window': unlocked (...)"
             cv.Optional(CONF_LAST_FRAME): text_sensor.text_sensor_schema(
                 icon="mdi:radio-tower",
                 entity_category=ENTITY_CATEGORY_DIAGNOSTIC,

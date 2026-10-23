@@ -93,7 +93,9 @@ convention for this class).
 doesn't say what kind of opening a detector is fitted to, so you enable it per
 opening. The tilt position itself is read from the frames.
 
-`device_id` accepts `0xEFCC85` or `"EFCC85"` (as printed in the logs).
+`device_id` accepts `0xEFCC85` (as printed in the logs) or the quoted hex
+string `"EFCC85"`. Don't write an all-digit ID without `0x` or quotes:
+YAML reads `123456` as a decimal number.
 
 To show each opening as its own device in Home Assistant (with its own area),
 declare a [sub-device](https://esphome.io/components/esphome/#sub-devices) and
@@ -138,8 +140,8 @@ with no handle position, for example `00 00` in bytes 8-9); its kind is
 `window`, `sliding`, or `other`.
 
 The hub's `last_frame` text sensor shows the last event of any device in Home
-Assistant, for example `EFCC85 'Tilt window': unlocked (tilt) (window, -67.5 dBm)`
-or `EFA055 unclaimed: locked (sliding, -70.0 dBm)`:
+Assistant, for example `0xEFCC85 'Tilt window': unlocked (tilt) (window, -67.5 dBm)`
+or `0xEFA055 unclaimed: locked (sliding, -70.0 dBm)`:
 
 ```yaml
 x3d_rfm69:

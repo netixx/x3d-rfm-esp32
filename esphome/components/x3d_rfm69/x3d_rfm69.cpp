@@ -90,7 +90,7 @@ void X3DRFM69::set_mode_(uint8_t mode) {
   this->write_register_(REG_DIO_MAPPING_2, 0x07);
 }
 
-void X3DRFM69::gpio_intr(X3DRFM69 *arg) { arg->enable_loop_soon_any_context(); }
+void IRAM_ATTR X3DRFM69::gpio_intr(X3DRFM69 *arg) { arg->enable_loop_soon_any_context(); }
 
 void X3DRFM69::setup() {
   if (this->dio0_pin_ != nullptr) {
@@ -255,9 +255,9 @@ void X3DRFM69::handle_frame_(const uint8_t *buf, size_t len, float rssi) {
   const char *kind_str = sensor_kind_to_string(frame);
 
   X3DOpening *opening = nullptr;
-  for (auto *d : this->openings_) {
-    if (d->get_device_id() == frame.device_id) {
-      opening = d;
+  for (auto *o : this->openings_) {
+    if (o->get_device_id() == frame.device_id) {
+      opening = o;
       break;
     }
   }
@@ -283,26 +283,28 @@ void X3DRFM69::handle_frame_(const uint8_t *buf, size_t len, float rssi) {
            frame.state_byte, raw.c_str());
 
   if (has_unexpected_bits(frame)) {
-    ESP_LOGW(TAG, "Device 0x%s%s%s%s: unexpected bits in bytes 8-14, please report. raw: %s", id_str,
-             opening != nullptr ? " '" : "", opening != nullptr ? opening->get_name() : "", opening != nullptr ? "'" : "",
-             raw.c_str());
+    const bool named = opening != nullptr;
+    ESP_LOGW(TAG, "Device 0x%s%s%s%s: unexpected bits in bytes 8-14, please report. raw: %s", id_str, named ? " '" : "",
+             named ? opening->get_name() : "", named ? "'" : "", raw.c_str());
   }
 
   if (opening != nullptr)
     opening->publish(frame, rssi);
   if (this->last_frame_ != nullptr) {
-    // "EFCC85 'Tilt window': unlocked (window, -67.5 dBm)" or "EFA00B unclaimed: locked (sliding, -71.0 dBm)"
+    // "0xEFCC85 'Tilt window': unlocked (window, -67.5 dBm)" or "0xEFA00B unclaimed: locked (sliding, -71.0 dBm)".
+    // The 0x prefix matters: copied without it, an all-digit ID would be read as decimal by YAML.
     char text[128];
     if (opening != nullptr) {
-      snprintf(text, sizeof(text), "%s '%s': %s (%s, %.1f dBm)", id_str, opening->get_name(), shown_str, kind_str, rssi);
+      snprintf(text, sizeof(text), "0x%s '%s': %s (%s, %.1f dBm)", id_str, opening->get_name(), shown_str, kind_str,
+               rssi);
     } else {
-      snprintf(text, sizeof(text), "%s unclaimed: %s (%s, %.1f dBm)", id_str, shown_str, kind_str, rssi);
+      snprintf(text, sizeof(text), "0x%s unclaimed: %s (%s, %.1f dBm)", id_str, shown_str, kind_str, rssi);
     }
     this->last_frame_->publish_state(text);
   }
 
-  this->event_trigger_.trigger(std::string(id_str), std::string(state_str), is_tilted(frame), std::string(kind_str), rssi,
-                              raw);
+  this->event_trigger_.trigger(std::string(id_str), std::string(state_str), is_tilted(frame), std::string(kind_str),
+                               rssi, raw);
 }
 
 void X3DRFM69::dump_config() {
