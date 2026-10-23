@@ -36,20 +36,36 @@ uint16_t crc16_xmodem(const uint8_t *data, size_t len) {
   return crc;
 }
 
-ParseResult parse_sensor_frame(const uint8_t *buf, size_t buf_len, SensorFrame *out) {
-  if (buf_len < IDX_HEADER + 1)
+ParseResult parse_frame(const uint8_t *buf, size_t buf_len, X3DFrame *out) {
+  if (buf_len < IDX_DEVICE_ID + 3)
     return ParseResult::TOO_SHORT;
 
   const size_t len = buf[IDX_LEN];
-  if (len < IDX_HEADER + 1 + 2 || len > buf_len || len > X3D_MAX_FRAME_LEN)
+  // Length byte, header up to the device id, CRC.
+  if (len < IDX_DEVICE_ID + 3 + 2 || len > buf_len || len > X3D_MAX_FRAME_LEN)
     return ParseResult::BAD_LENGTH;
 
   const uint16_t rx_crc = static_cast<uint16_t>(buf[len - 2] << 8 | buf[len - 1]);
   if (crc16_xmodem(buf, len - 2) != rx_crc)
     return ParseResult::BAD_CRC;
 
-  if (buf[IDX_TYPE] != X3D_MSG_TYPE_SENSOR)
+  out->length = static_cast<uint8_t>(len);
+  out->msg_no = buf[IDX_MSG_NO];
+  out->msg_type = buf[IDX_TYPE];
+  out->header_len = buf[IDX_HEADER] & HEADER_LEN_MASK;
+  out->device_id = static_cast<uint32_t>(buf[IDX_DEVICE_ID]) | static_cast<uint32_t>(buf[IDX_DEVICE_ID + 1]) << 8 |
+                   static_cast<uint32_t>(buf[IDX_DEVICE_ID + 2]) << 16;
+  return ParseResult::OK;
+}
+
+ParseResult parse_sensor_frame(const uint8_t *buf, size_t buf_len, SensorFrame *out) {
+  X3DFrame common{};
+  ParseResult res = parse_frame(buf, buf_len, &common);
+  if (res != ParseResult::OK)
+    return res;
+  if (common.msg_type != X3D_MSG_TYPE_SENSOR)
     return ParseResult::NOT_SENSOR;
+  const size_t len = common.length;
 
   // Header runs from idx 4 for hdr_len bytes; its last 2 bytes are the checksum
   // and the CRC must follow right after it.
@@ -67,10 +83,9 @@ ParseResult parse_sensor_frame(const uint8_t *buf, size_t buf_len, SensorFrame *
   if (expected_chk != rx_chk)
     return ParseResult::BAD_HEADER_CHECKSUM;
 
-  out->length = static_cast<uint8_t>(len);
-  out->msg_no = buf[IDX_MSG_NO];
-  out->device_id = static_cast<uint32_t>(buf[IDX_DEVICE_ID]) | static_cast<uint32_t>(buf[IDX_DEVICE_ID + 1]) << 8 |
-                   static_cast<uint32_t>(buf[IDX_DEVICE_ID + 2]) << 16;
+  out->length = common.length;
+  out->msg_no = common.msg_no;
+  out->device_id = common.device_id;
   out->flags = buf[IDX_FLAGS];
   out->state_byte = buf[IDX_STATE];
   out->extra_len = 0;
@@ -111,6 +126,21 @@ const char *sensor_kind_to_string(const SensorFrame &frame) {
       return "sliding";
   }
   return "other";
+}
+
+const char *msg_type_to_string(uint8_t msg_type) {
+  switch (msg_type) {
+    case 0x00:
+      return "sensor";
+    case 0x01:
+      return "standard";
+    case 0x02:
+      return "pairing";
+    case 0x03:
+      return "beacon";
+    default:
+      return "other";
+  }
 }
 
 const char *parse_result_to_string(ParseResult result) {

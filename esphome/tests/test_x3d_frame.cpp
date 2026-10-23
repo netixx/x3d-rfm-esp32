@@ -160,6 +160,31 @@ static void test_corruption() {
   CHECK(has_unexpected_bits(f));
 }
 
+static void test_parse_any_frame() {
+  X3DFrame f{};
+  CHECK(parse_frame(CAPTURES[0].frame, 19, &f) == ParseResult::OK);
+  CHECK(f.device_id == 0xEFCC85);
+  CHECK(f.msg_type == X3D_MSG_TYPE_SENSOR);
+  CHECK(f.msg_no == 0x53);
+  CHECK(f.header_len == 0x0d);
+
+  // Non sensor message (type 1) with a valid CRC: common fields still decoded.
+  uint8_t buf[19];
+  std::memcpy(buf, CAPTURES[0].frame, sizeof(buf));
+  buf[3] = 0x01;
+  uint16_t crc = crc16_xmodem(buf, 17);
+  buf[17] = crc >> 8;
+  buf[18] = crc & 0xff;
+  CHECK(parse_frame(buf, sizeof(buf), &f) == ParseResult::OK);
+  CHECK(f.device_id == 0xEFCC85);
+  CHECK(f.msg_type == 0x01);
+  CHECK(std::strcmp(msg_type_to_string(f.msg_type), "standard") == 0);
+  CHECK(std::strcmp(msg_type_to_string(0x42), "other") == 0);
+
+  buf[5] ^= 0x01;  // corrupt device id
+  CHECK(parse_frame(buf, sizeof(buf), &f) == ParseResult::BAD_CRC);
+}
+
 static void test_decode_state() {
   CHECK(decode_handle_state(0x41) == HandleState::UNLOCKED);
   CHECK(decode_handle_state(0x01) == HandleState::LOCKED);
@@ -225,6 +250,7 @@ int main() {
   test_parse_not_changed();
   test_trailing_garbage();
   test_corruption();
+  test_parse_any_frame();
   test_decode_state();
   test_replay_capture();
   test_dedup();

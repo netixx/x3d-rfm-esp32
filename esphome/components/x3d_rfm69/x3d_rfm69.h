@@ -6,6 +6,8 @@
 #include "esphome/core/automation.h"
 #include "esphome/core/component.h"
 #include "esphome/core/hal.h"
+#include "esphome/core/helpers.h"
+#include "esphome/core/preferences.h"
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/spi/spi.h"
@@ -28,23 +30,60 @@ class X3DOpening {
   uint32_t get_device_id() const { return this->device_id_; }
   const char *get_name() const { return this->name_; }
 
+  /// Publish the last handle position saved in flash, so entities aren't
+  /// "unknown" after a reboot until the handle moves again.
+  void restore_state() {
+    this->pref_ = global_preferences->make_preference<uint8_t>(fnv1_hash_extend(fnv1_hash("x3d_rfm69"),
+                                                                                this->device_id_));
+    uint8_t saved;
+    if (this->pref_.load(&saved) && saved >= SAVED_LOCKED && saved <= SAVED_TILTED) {
+      this->saved_ = saved;
+      this->publish_handle_(saved == SAVED_LOCKED ? HandleState::LOCKED : HandleState::UNLOCKED, saved == SAVED_TILTED);
+    }
+    this->restore_ = true;
+  }
+
+  /// Handle event (sensor message).
   void publish(const SensorFrame &frame, float rssi) {
     if (frame.state != HandleState::UNCHANGED) {
-      // Home Assistant lock device class: ON means unlocked.
-      if (this->lock_ != nullptr)
-        this->lock_->publish_state(frame.state == HandleState::UNLOCKED);
-      if (this->tilt_ != nullptr)
-        this->tilt_->publish_state(is_tilted(frame));
-      if (this->state_ != nullptr)
-        this->state_->publish_state(handle_state_to_string(frame.state));
+      const bool tilted = is_tilted(frame);
+      this->publish_handle_(frame.state, tilted);
+      const uint8_t saved =
+          frame.state == HandleState::LOCKED ? SAVED_LOCKED : (tilted ? SAVED_TILTED : SAVED_UNLOCKED);
+      if (this->restore_ && saved != this->saved_) {
+        this->saved_ = saved;
+        this->pref_.save(&saved);
+      }
     }
+    this->publish_seen(rssi);
+  }
+
+  /// Any valid frame from this device: only the signal strength is known.
+  void publish_seen(float rssi) {
     if (this->rssi_ != nullptr)
       this->rssi_->publish_state(rssi);
   }
 
  protected:
+  static constexpr uint8_t SAVED_LOCKED = 1;
+  static constexpr uint8_t SAVED_UNLOCKED = 2;
+  static constexpr uint8_t SAVED_TILTED = 3;
+
+  void publish_handle_(HandleState state, bool tilted) {
+    // Home Assistant lock device class: ON means unlocked.
+    if (this->lock_ != nullptr)
+      this->lock_->publish_state(state == HandleState::UNLOCKED);
+    if (this->tilt_ != nullptr)
+      this->tilt_->publish_state(tilted);
+    if (this->state_ != nullptr)
+      this->state_->publish_state(handle_state_to_string(state));
+  }
+
   uint32_t device_id_;
   const char *name_;
+  ESPPreferenceObject pref_;
+  uint8_t saved_{0};
+  bool restore_{false};
   binary_sensor::BinarySensor *lock_{nullptr};
   binary_sensor::BinarySensor *tilt_{nullptr};
   text_sensor::TextSensor *state_{nullptr};
@@ -63,7 +102,7 @@ class X3DRFM69 : public Component,
   void set_dio0_pin(InternalGPIOPin *pin) { this->dio0_pin_ = pin; }
   void set_frequency(uint32_t frequency) { this->frequency_ = frequency; }
   void set_log_unclaimed_devices(bool log) { this->log_unclaimed_devices_ = log; }
-  void set_log_raw_frames(bool log) { this->log_raw_frames_ = log; }
+  void set_restore_state(bool restore) { this->restore_state_ = restore; }
 
   void add_opening(X3DOpening *opening) { this->openings_.push_back(opening); }
   /// Hub-wide text sensor showing the last event of any device (discovery).
@@ -82,17 +121,23 @@ class X3DRFM69 : public Component,
   bool payload_ready_();
   void read_and_handle_packet_();
   void handle_frame_(const uint8_t *buf, size_t len, float rssi);
+  X3DOpening *find_opening_(uint32_t device_id);
+  /// True the first time an unclaimed device is seen since boot.
+  bool first_sighting_(uint32_t device_id);
+  /// Warn once if an opening was configured with the ID in raw (byte-reversed) order.
+  void check_reversed_id_(uint32_t device_id, const char *id_str);
 
   static void gpio_intr(X3DRFM69 *arg);
 
   InternalGPIOPin *dio0_pin_{nullptr};
   uint32_t frequency_{868950000};
   bool log_unclaimed_devices_{true};
-  bool log_raw_frames_{false};
+  bool restore_state_{true};
   uint8_t mode_{0xff};
 
   Deduplicator dedup_;
   std::vector<X3DOpening *> openings_;
+  std::vector<uint32_t> sighted_;
   text_sensor::TextSensor *last_frame_{nullptr};
   Trigger<std::string, std::string, bool, std::string, float, std::string> event_trigger_;
 };

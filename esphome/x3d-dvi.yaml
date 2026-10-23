@@ -27,6 +27,8 @@ external_components:
 
 logger:
   level: DEBUG
+  # DEBUG: one decoded line per X3D frame. VERBOSE adds the raw bytes of
+  # every packet received.
 
 api:
   encryption:
@@ -50,11 +52,11 @@ x3d_rfm69:
   cs_pin: GPIO5
   dio0_pin: GPIO4
   frequency: 868.95MHz
-  # Discovery: log events of devices not listed under "openings:" at INFO,
+  # Discovery: log what devices not listed under "openings:" send at INFO,
   # with their ID. Listed (claimed) devices log at DEBUG.
   log_unclaimed_devices: true
-  # Log every raw packet received (noisy, for debugging only).
-  log_raw_frames: false
+  # Publish the last saved handle position at boot (entities not "unknown").
+  restore_state: true
   # Last event of any device: turn each handle and read its ID here or in the logs.
   last_frame:
     name: "Last X3D frame"

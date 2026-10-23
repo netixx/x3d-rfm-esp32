@@ -97,6 +97,11 @@ opening. The tilt position itself is read from the frames.
 string `"EFCC85"`. Don't write an all-digit ID without `0x` or quotes:
 YAML reads `123456` as a decimal number.
 
+The ID is sent little endian: raw bytes `85 cc ef` (bytes 5-7 of the frame)
+are device `0xEFCC85`. Copy IDs from the logs or `last_frame`, which print them
+in the right order. If an opening is configured with the raw byte order, a
+warning at boot-time traffic tells you which value to use.
+
 To show each opening as its own device in Home Assistant (with its own area),
 declare a [sub-device](https://esphome.io/components/esphome/#sub-devices) and
 reference it with `device:`. Its entities are then named `Lock`, `Tilted`,
@@ -120,18 +125,23 @@ x3d_rfm69:
 ## Finding device IDs
 
 Flash with `log_unclaimed_devices: true` (the default), then turn each handle
-one opening at a time. Devices not listed under `openings:` (*unclaimed*) are
-logged at INFO, so they stand out:
+one opening at a time. What devices not listed under `openings:` (*unclaimed*)
+send is logged at INFO, so it stands out: every handle event, and the first
+message of any other type (thermostats, Tydom box, ...):
 
 ```
 [I][x3d_rfm69]: Unclaimed device 0xEFCC85 (window): unlocked (tilt), -67.5 dBm -> add it under 'openings:' with 'device_id: 0xEFCC85'
+[I][x3d_rfm69]: Unclaimed device 0x5A1B2C: standard message 0x01 (not a handle event), -80.0 dBm. Logged once, next ones at DEBUG
 ```
 
-Once claimed, the device is logged at DEBUG with its name:
+At DEBUG every valid X3D frame gets one decoded line, claimed devices with
+their name:
 
 ```
-[D][x3d_rfm69]: 'Tilt window' (0xEFCC85, window): unlocked (tilt), -67.5 dBm
-[D][x3d_rfm69]: 'Sliding door' (0xEFA00B, sliding): state unchanged (no handle position in this frame), keeping current value, -71.0 dBm
+[D][x3d_rfm69]: 'Tilt window' (0xEFCC85, window): unlocked (tilt), msg 0x55, -67.5 dBm
+[D][x3d_rfm69]: 'Sliding door' (0xEFA00B, sliding): unchanged, msg 0x37, -71.0 dBm
+[D][x3d_rfm69]: Unclaimed device 0x5A1B2C: standard message 0x01, msg 0x12, -80.0 dBm
+[D][x3d_rfm69]: Invalid frame (bad CRC), length byte 19, -95.0 dBm
 ```
 
 Wording used everywhere: a device is *claimed* or *unclaimed* (listed under
@@ -153,10 +163,33 @@ Log levels:
 
 | Level   | What                                                                 |
 |---------|----------------------------------------------------------------------|
-| INFO    | Events of unclaimed devices (with `log_unclaimed_devices: true`)     |
+| INFO    | Unclaimed devices: handle events, first message of other types       |
 | WARN    | Unexpected values in bytes 8-14, with the raw frame                  |
-| DEBUG   | Events of claimed devices, every raw packet with `log_raw_frames`    |
-| VERBOSE | Raw bytes of each event, radio repeats, ignored non-sensor X3D traffic |
+| DEBUG   | One decoded line per frame: device ID, name, message type, state; invalid frames with the reason |
+| VERBOSE | Raw bytes of every packet received, radio repeats                    |
+
+To see the raw bytes, set the logger to VERBOSE. Other components get verbose
+too; quiet the noisy ones per tag:
+
+```yaml
+logger:
+  level: VERBOSE          # highest level compiled in
+  logs:
+    api: DEBUG            # example: keep other tags at DEBUG
+    wifi: DEBUG
+```
+
+## Entity states after a reboot
+
+The DVI only transmits when the handle moves, so after a reboot nothing is
+known until then. With `restore_state: true` (the default), the last handle
+position is saved to flash and published at boot. If a handle moved while the
+ESP was off, the entity shows the old position until the next event.
+
+An entity Home Assistant shows as **unavailable** while the ESP is online is
+usually one the firmware no longer provides, for example after renaming an
+opening or disabling `state` / `rssi`. Remove it from Home Assistant
+(*Settings → Entities*).
 
 ## Mapping IDs in Home Assistant instead (no reflash per opening)
 
@@ -199,7 +232,7 @@ x3d_rfm69:
   dio0_pin: GPIO4          # optional, PayloadReady interrupt
   frequency: 868.95MHz     # default
   log_unclaimed_devices: true
-  log_raw_frames: false    # log every packet received, including other X3D traffic
+  restore_state: true      # publish the last saved handle position at boot
   last_frame: ...          # optional text sensor, last event of any device
   openings: ...            # claimed devices and their entities
   on_opening_event: ...    # variables: device_id, state, tilted, kind, rssi, raw

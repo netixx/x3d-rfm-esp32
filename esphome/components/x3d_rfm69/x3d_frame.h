@@ -36,6 +36,15 @@ enum class ParseResult : uint8_t {
   BAD_HEADER_CHECKSUM,
 };
 
+/// Fields common to every X3D frame (any message type).
+struct X3DFrame {
+  uint8_t length;      // idx 0, total frame length including length byte and CRC
+  uint8_t msg_no;      // idx 2, rolling message number
+  uint8_t msg_type;    // idx 3, 0 sensor, 1 standard, 2 pairing, 3 beacon
+  uint8_t header_len;  // idx 4, low 5 bits
+  uint32_t device_id;  // idx 5..7, little endian
+};
+
 struct SensorFrame {
   uint8_t length;      // idx 0, total frame length including length byte and CRC
   uint8_t msg_no;      // idx 2, rolling message number
@@ -51,9 +60,15 @@ struct SensorFrame {
 /// Verified against the DVI captures (over length byte + payload, stored big endian).
 uint16_t crc16_xmodem(const uint8_t *data, size_t len);
 
-/// Parse a de-whitened frame as read from the SX1231 FIFO (buf[0] = length byte).
-/// buf_len is the number of bytes available in buf; trailing garbage is ignored.
+/// Check length and CRC of any X3D frame and read its common fields.
+/// buf[0] is the length byte as read from the SX1231 FIFO; buf_len is the number
+/// of bytes available in buf; trailing garbage is ignored.
+ParseResult parse_frame(const uint8_t *buf, size_t buf_len, X3DFrame *out);
+
+/// Parse a sensor (DVI) message: parse_frame() plus header checks and handle state.
 ParseResult parse_sensor_frame(const uint8_t *buf, size_t buf_len, SensorFrame *out);
+
+const char *msg_type_to_string(uint8_t msg_type);
 
 HandleState decode_handle_state(uint8_t state_byte);
 

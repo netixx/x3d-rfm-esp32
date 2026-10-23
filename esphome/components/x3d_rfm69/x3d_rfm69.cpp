@@ -131,6 +131,11 @@ void X3DRFM69::setup() {
   this->configure_radio_();
   this->receive_begin_();
 
+  if (this->restore_state_) {
+    for (auto *opening : this->openings_)
+      opening->restore_state();
+  }
+
   // Safety net: if a DIO0 edge was missed the pin stays high and no new edge comes.
   if (this->dio0_pin_ != nullptr) {
     this->set_interval(1000, [this]() {
@@ -228,59 +233,104 @@ void X3DRFM69::read_and_handle_packet_() {
   this->handle_frame_(buf, len + 1, rssi);
 }
 
+X3DOpening *X3DRFM69::find_opening_(uint32_t device_id) {
+  for (auto *opening : this->openings_) {
+    if (opening->get_device_id() == device_id)
+      return opening;
+  }
+  return nullptr;
+}
+
+bool X3DRFM69::first_sighting_(uint32_t device_id) {
+  static constexpr size_t MAX_SIGHTED = 64;
+  for (uint32_t id : this->sighted_) {
+    if (id == device_id)
+      return false;
+  }
+  if (this->sighted_.size() < MAX_SIGHTED)
+    this->sighted_.push_back(device_id);
+  return true;
+}
+
+void X3DRFM69::check_reversed_id_(uint32_t device_id, const char *id_str) {
+  // The ID is little endian on air: raw bytes "85 cc ef" are device 0xEFCC85.
+  const uint32_t reversed = (device_id & 0xFF) << 16 | (device_id & 0xFF00) | (device_id >> 16 & 0xFF);
+  X3DOpening *opening = this->find_opening_(reversed);
+  if (opening != nullptr && reversed != device_id && this->first_sighting_(device_id)) {
+    ESP_LOGW(TAG, "'%s' is configured with device_id 0x%06" PRIX32 ", the raw byte order of device 0x%s. Use "
+             "'device_id: 0x%s'", opening->get_name(), reversed, id_str, id_str);
+  }
+}
+
+// Log levels: VERBOSE raw bytes and repeats, DEBUG one decoded line per frame,
+// INFO what unclaimed devices send (to find their IDs), WARN unexpected bits.
 void X3DRFM69::handle_frame_(const uint8_t *buf, size_t len, float rssi) {
-  if (this->log_raw_frames_) {
-    ESP_LOGD(TAG, "RX %.1f dBm: %s", rssi, to_hex(buf, len).c_str());
+  ESP_LOGV(TAG, "RX %.1f dBm: %s", rssi, to_hex(buf, len).c_str());
+
+  X3DFrame common{};
+  ParseResult res = parse_frame(buf, len, &common);
+  if (res != ParseResult::OK) {
+    ESP_LOGD(TAG, "Invalid frame (%s), length byte %u, %.1f dBm", parse_result_to_string(res), buf[0], rssi);
+    return;
+  }
+
+  char id_str[7];
+  snprintf(id_str, sizeof(id_str), "%06" PRIX32, common.device_id);
+
+  if (!this->dedup_.is_new(common.device_id, common.msg_no, millis())) {
+    ESP_LOGV(TAG, "0x%s: repeat of msg 0x%02X", id_str, common.msg_no);
+    return;
+  }
+
+  X3DOpening *opening = this->find_opening_(common.device_id);
+  if (opening == nullptr)
+    this->check_reversed_id_(common.device_id, id_str);
+  const std::string raw = to_hex(buf, common.length);
+
+  if (common.msg_type != X3D_MSG_TYPE_SENSOR) {
+    // Not a handle event (thermostats, Tydom, pairing, beacons...).
+    const char *type_str = msg_type_to_string(common.msg_type);
+    if (opening != nullptr) {
+      ESP_LOGD(TAG, "'%s' (0x%s): %s message 0x%02X, msg 0x%02X, %.1f dBm", opening->get_name(), id_str, type_str,
+               common.msg_type, common.msg_no, rssi);
+      opening->publish_seen(rssi);
+    } else if (this->log_unclaimed_devices_ && this->first_sighting_(common.device_id)) {
+      ESP_LOGI(TAG, "Unclaimed device 0x%s: %s message 0x%02X (not a handle event), %.1f dBm. Logged once, "
+               "next ones at DEBUG", id_str, type_str, common.msg_type, rssi);
+    } else {
+      ESP_LOGD(TAG, "Unclaimed device 0x%s: %s message 0x%02X, msg 0x%02X, %.1f dBm", id_str, type_str,
+               common.msg_type, common.msg_no, rssi);
+    }
+    return;
   }
 
   SensorFrame frame{};
-  ParseResult res = parse_sensor_frame(buf, len, &frame);
+  res = parse_sensor_frame(buf, len, &frame);
   if (res != ParseResult::OK) {
-    // Other X3D traffic (thermostats, beacons, ...) is expected: keep it quiet.
-    ESP_LOGV(TAG, "Ignored frame (%s): %s", parse_result_to_string(res), to_hex(buf, len).c_str());
+    ESP_LOGD(TAG, "0x%s: sensor message rejected (%s), %.1f dBm", id_str, parse_result_to_string(res), rssi);
+    ESP_LOGV(TAG, "0x%s: raw %s", id_str, raw.c_str());
     return;
   }
 
-  if (!this->dedup_.is_new(frame.device_id, frame.msg_no, millis())) {
-    ESP_LOGV(TAG, "Repeat of %06" PRIX32 " msg 0x%02X", frame.device_id, frame.msg_no);
-    return;
-  }
-
-  const std::string raw = to_hex(buf, frame.length);
-  char id_str[7];
-  snprintf(id_str, sizeof(id_str), "%06" PRIX32, frame.device_id);
   const char *state_str = handle_state_to_string(frame.state);
   // For logs and last_frame only: the tilt position is shown next to the state.
   const char *shown_str = is_tilted(frame) ? "unlocked (tilt)" : state_str;
   const char *kind_str = sensor_kind_to_string(frame);
 
-  X3DOpening *opening = nullptr;
-  for (auto *o : this->openings_) {
-    if (o->get_device_id() == frame.device_id) {
-      opening = o;
-      break;
-    }
-  }
-
   if (opening == nullptr) {
-    // INFO only for unclaimed devices, so they stand out while discovering.
     if (this->log_unclaimed_devices_) {
-      if (frame.state == HandleState::UNCHANGED) {
-        ESP_LOGI(TAG, "Unclaimed device 0x%s (%s): state unchanged (no handle position in this frame), %.1f dBm -> "
-                 "add it under 'openings:' with 'device_id: 0x%s'", id_str, kind_str, rssi, id_str);
-      } else {
-        ESP_LOGI(TAG, "Unclaimed device 0x%s (%s): %s, %.1f dBm -> add it under 'openings:' with 'device_id: 0x%s'",
-                 id_str, kind_str, shown_str, rssi, id_str);
-      }
+      this->first_sighting_(frame.device_id);
+      ESP_LOGI(TAG, "Unclaimed device 0x%s (%s): %s, %.1f dBm -> add it under 'openings:' with 'device_id: 0x%s'",
+               id_str, kind_str, shown_str, rssi, id_str);
+    } else {
+      ESP_LOGD(TAG, "Unclaimed device 0x%s (%s): %s, msg 0x%02X, %.1f dBm", id_str, kind_str, shown_str,
+               frame.msg_no, rssi);
     }
-  } else if (frame.state == HandleState::UNCHANGED) {
-    ESP_LOGD(TAG, "'%s' (0x%s, %s): state unchanged (no handle position in this frame), keeping current value, "
-             "%.1f dBm", opening->get_name(), id_str, kind_str, rssi);
   } else {
-    ESP_LOGD(TAG, "'%s' (0x%s, %s): %s, %.1f dBm", opening->get_name(), id_str, kind_str, shown_str, rssi);
+    ESP_LOGD(TAG, "'%s' (0x%s, %s): %s, msg 0x%02X, %.1f dBm", opening->get_name(), id_str, kind_str, shown_str,
+             frame.msg_no, rssi);
   }
-  ESP_LOGV(TAG, "Device 0x%s msg 0x%02X, bytes 8-9: %02X %02X, raw: %s", id_str, frame.msg_no, frame.flags,
-           frame.state_byte, raw.c_str());
+  ESP_LOGV(TAG, "0x%s: bytes 8-9: %02X %02X, raw %s", id_str, frame.flags, frame.state_byte, raw.c_str());
 
   if (has_unexpected_bits(frame)) {
     const bool named = opening != nullptr;
@@ -314,9 +364,9 @@ void X3DRFM69::dump_config() {
   ESP_LOGCONFIG(TAG,
                 "  Frequency: %" PRIu32 " Hz\n"
                 "  Log unclaimed devices: %s\n"
-                "  Log raw frames: %s\n"
+                "  Restore state: %s\n"
                 "  Openings: %u",
-                this->frequency_, YESNO(this->log_unclaimed_devices_), YESNO(this->log_raw_frames_),
+                this->frequency_, YESNO(this->log_unclaimed_devices_), YESNO(this->restore_state_),
                 static_cast<unsigned>(this->openings_.size()));
   if (this->is_failed())
     ESP_LOGE(TAG, "  Radio initialisation failed, see earlier log");

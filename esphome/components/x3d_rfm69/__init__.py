@@ -25,6 +25,7 @@ MULTI_CONF = True
 CONF_DIO0_PIN = "dio0_pin"
 CONF_LOG_UNCLAIMED_DEVICES = "log_unclaimed_devices"
 CONF_LOG_RAW_FRAMES = "log_raw_frames"
+CONF_RESTORE_STATE = "restore_state"
 CONF_ON_OPENING_EVENT = "on_opening_event"
 CONF_LAST_FRAME = "last_frame"
 CONF_OPENINGS = "openings"
@@ -146,7 +147,12 @@ CONFIG_SCHEMA = (
                 cv.frequency, cv.float_range(min=290e6, max=1020e6)
             ),
             cv.Optional(CONF_LOG_UNCLAIMED_DEVICES, default=True): cv.boolean,
-            cv.Optional(CONF_LOG_RAW_FRAMES, default=False): cv.boolean,
+            cv.Optional(CONF_LOG_RAW_FRAMES): cv.invalid(
+                "'log_raw_frames' was removed: raw frames are logged at VERBOSE level"
+                " (logger: level: VERBOSE)"
+            ),
+            # Publish the last saved handle position at boot.
+            cv.Optional(CONF_RESTORE_STATE, default=True): cv.boolean,
             cv.Optional(CONF_OPENINGS, default=[]): cv.All(
                 cv.ensure_list(OPENING_SCHEMA), _unique_device_ids
             ),
@@ -175,7 +181,7 @@ async def to_code(config):
         cg.add(var.set_dio0_pin(pin))
     cg.add(var.set_frequency(int(config[CONF_FREQUENCY])))
     cg.add(var.set_log_unclaimed_devices(config[CONF_LOG_UNCLAIMED_DEVICES]))
-    cg.add(var.set_log_raw_frames(config[CONF_LOG_RAW_FRAMES]))
+    cg.add(var.set_restore_state(config[CONF_RESTORE_STATE]))
 
     for opening_config in config[CONF_OPENINGS]:
         opening = cg.new_Pvariable(
