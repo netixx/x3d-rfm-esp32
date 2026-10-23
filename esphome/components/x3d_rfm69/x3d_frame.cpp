@@ -76,27 +76,31 @@ ParseResult parse_sensor_frame(const uint8_t *buf, size_t buf_len, SensorFrame *
   out->extra_len = 0;
   for (size_t i = IDX_EXTRA; i < chk_idx && out->extra_len < sizeof(out->extra); i++)
     out->extra[out->extra_len++] = buf[i];
-  out->state = decode_window_state(out->state_byte);
+  out->state = decode_handle_state(out->state_byte);
   return ParseResult::OK;
 }
 
-WindowState decode_window_state(uint8_t state_byte) {
+HandleState decode_handle_state(uint8_t state_byte) {
   if (state_byte & DVI_STATE_UNLOCKED_BIT)
-    return WindowState::UNLOCKED;
+    return HandleState::UNLOCKED;
   if (state_byte & DVI_STATE_VALID_BIT)
-    return WindowState::LOCKED;
-  return WindowState::UNCHANGED;
+    return HandleState::LOCKED;
+  return HandleState::UNCHANGED;
 }
 
-const char *window_state_to_string(WindowState state) {
+const char *handle_state_to_string(HandleState state) {
   switch (state) {
-    case WindowState::LOCKED:
+    case HandleState::LOCKED:
       return "locked";
-    case WindowState::UNLOCKED:
+    case HandleState::UNLOCKED:
       return "unlocked";
     default:
       return "unchanged";
   }
+}
+
+bool is_tilted(const SensorFrame &frame) {
+  return frame.state == HandleState::UNLOCKED && (frame.flags & DVI_FLAG_TILT) != 0;
 }
 
 const char *sensor_kind_to_string(const SensorFrame &frame) {

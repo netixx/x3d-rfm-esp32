@@ -249,57 +249,60 @@ void X3DRFM69::handle_frame_(const uint8_t *buf, size_t len, float rssi) {
   const std::string raw = to_hex(buf, frame.length);
   char id_str[7];
   snprintf(id_str, sizeof(id_str), "%06" PRIX32, frame.device_id);
-  const char *state_str = window_state_to_string(frame.state);
+  const char *state_str = handle_state_to_string(frame.state);
+  // For logs and last_frame only: the tilt position is shown next to the state.
+  const char *shown_str = is_tilted(frame) ? "unlocked (tilt)" : state_str;
   const char *kind_str = sensor_kind_to_string(frame);
 
-  X3DWindow *window = nullptr;
-  for (auto *w : this->windows_) {
-    if (w->get_device_id() == frame.device_id) {
-      window = w;
+  X3DOpening *opening = nullptr;
+  for (auto *d : this->openings_) {
+    if (d->get_device_id() == frame.device_id) {
+      opening = d;
       break;
     }
   }
 
-  if (window == nullptr) {
+  if (opening == nullptr) {
     // INFO only for unclaimed devices, so they stand out while discovering.
     if (this->log_unclaimed_devices_) {
-      if (frame.state == WindowState::UNCHANGED) {
+      if (frame.state == HandleState::UNCHANGED) {
         ESP_LOGI(TAG, "Unclaimed device 0x%s (%s): state unchanged (no handle position in this frame), %.1f dBm -> "
-                 "add it under 'windows:' with 'device_id: 0x%s'", id_str, kind_str, rssi, id_str);
+                 "add it under 'openings:' with 'device_id: 0x%s'", id_str, kind_str, rssi, id_str);
       } else {
-        ESP_LOGI(TAG, "Unclaimed device 0x%s (%s): %s, %.1f dBm -> add it under 'windows:' with 'device_id: 0x%s'",
-                 id_str, kind_str, state_str, rssi, id_str);
+        ESP_LOGI(TAG, "Unclaimed device 0x%s (%s): %s, %.1f dBm -> add it under 'openings:' with 'device_id: 0x%s'",
+                 id_str, kind_str, shown_str, rssi, id_str);
       }
     }
-  } else if (frame.state == WindowState::UNCHANGED) {
+  } else if (frame.state == HandleState::UNCHANGED) {
     ESP_LOGD(TAG, "'%s' (0x%s, %s): state unchanged (no handle position in this frame), keeping current value, "
-             "%.1f dBm", window->get_name(), id_str, kind_str, rssi);
+             "%.1f dBm", opening->get_name(), id_str, kind_str, rssi);
   } else {
-    ESP_LOGD(TAG, "'%s' (0x%s, %s): %s, %.1f dBm", window->get_name(), id_str, kind_str, state_str, rssi);
+    ESP_LOGD(TAG, "'%s' (0x%s, %s): %s, %.1f dBm", opening->get_name(), id_str, kind_str, shown_str, rssi);
   }
   ESP_LOGV(TAG, "Device 0x%s msg 0x%02X, bytes 8-9: %02X %02X, raw: %s", id_str, frame.msg_no, frame.flags,
            frame.state_byte, raw.c_str());
 
   if (has_unexpected_bits(frame)) {
     ESP_LOGW(TAG, "Device 0x%s%s%s%s: unexpected bits in bytes 8-14, please report. raw: %s", id_str,
-             window != nullptr ? " '" : "", window != nullptr ? window->get_name() : "", window != nullptr ? "'" : "",
+             opening != nullptr ? " '" : "", opening != nullptr ? opening->get_name() : "", opening != nullptr ? "'" : "",
              raw.c_str());
   }
 
-  if (window != nullptr)
-    window->publish(frame, rssi);
+  if (opening != nullptr)
+    opening->publish(frame, rssi);
   if (this->last_frame_ != nullptr) {
     // "EFCC85 'Tilt window': unlocked (window, -67.5 dBm)" or "EFA00B unclaimed: locked (sliding, -71.0 dBm)"
     char text[128];
-    if (window != nullptr) {
-      snprintf(text, sizeof(text), "%s '%s': %s (%s, %.1f dBm)", id_str, window->get_name(), state_str, kind_str, rssi);
+    if (opening != nullptr) {
+      snprintf(text, sizeof(text), "%s '%s': %s (%s, %.1f dBm)", id_str, opening->get_name(), shown_str, kind_str, rssi);
     } else {
-      snprintf(text, sizeof(text), "%s unclaimed: %s (%s, %.1f dBm)", id_str, state_str, kind_str, rssi);
+      snprintf(text, sizeof(text), "%s unclaimed: %s (%s, %.1f dBm)", id_str, shown_str, kind_str, rssi);
     }
     this->last_frame_->publish_state(text);
   }
 
-  this->event_trigger_.trigger(std::string(id_str), std::string(state_str), std::string(kind_str), rssi, raw);
+  this->event_trigger_.trigger(std::string(id_str), std::string(state_str), is_tilted(frame), std::string(kind_str), rssi,
+                              raw);
 }
 
 void X3DRFM69::dump_config() {
@@ -310,9 +313,9 @@ void X3DRFM69::dump_config() {
                 "  Frequency: %" PRIu32 " Hz\n"
                 "  Log unclaimed devices: %s\n"
                 "  Log raw frames: %s\n"
-                "  Windows: %u",
+                "  Openings: %u",
                 this->frequency_, YESNO(this->log_unclaimed_devices_), YESNO(this->log_raw_frames_),
-                static_cast<unsigned>(this->windows_.size()));
+                static_cast<unsigned>(this->openings_.size()));
   if (this->is_failed())
     ESP_LOGE(TAG, "  Radio initialisation failed, see earlier log");
 }

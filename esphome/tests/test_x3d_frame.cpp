@@ -81,8 +81,9 @@ static void test_parse_window() {
   CHECK(f.msg_no == 0x53);
   CHECK(f.flags == 0x08);
   CHECK(f.state_byte == 0x41);
-  CHECK(f.state == WindowState::UNLOCKED);
+  CHECK(f.state == HandleState::UNLOCKED);
   CHECK(std::strcmp(sensor_kind_to_string(f), "window") == 0);
+  CHECK(is_tilted(f));  // soufflet window: unlocked = tilt
   CHECK(!has_unexpected_bits(f));
 }
 
@@ -92,8 +93,9 @@ static void test_parse_sliding() {
   CHECK(parse_sensor_frame(CAPTURES[24].frame, 19, &f) == ParseResult::OK);
   CHECK(f.device_id == 0xEFA00B);
   CHECK(f.flags == 0x04);
-  CHECK(f.state == WindowState::UNLOCKED);
+  CHECK(f.state == HandleState::UNLOCKED);
   CHECK(std::strcmp(sensor_kind_to_string(f), "sliding") == 0);
+  CHECK(!is_tilted(f));  // sliding door: unlocked, no tilt
   CHECK(!has_unexpected_bits(f));
 }
 
@@ -101,7 +103,7 @@ static void test_parse_not_changed() {
   SensorFrame f{};
   CHECK(parse_sensor_frame(FRAME_NOT_CHANGED, sizeof(FRAME_NOT_CHANGED), &f) == ParseResult::OK);
   CHECK(f.device_id == 0xEFA055);
-  CHECK(f.state == WindowState::UNCHANGED);
+  CHECK(f.state == HandleState::UNCHANGED);
   CHECK(!has_unexpected_bits(f));
 }
 
@@ -111,7 +113,8 @@ static void test_trailing_garbage() {
   std::memcpy(buf, CAPTURES[6].frame, 19);
   SensorFrame f{};
   CHECK(parse_sensor_frame(buf, sizeof(buf), &f) == ParseResult::OK);
-  CHECK(f.state == WindowState::LOCKED);
+  CHECK(f.state == HandleState::LOCKED);
+  CHECK(!is_tilted(f));
 }
 
 static void test_corruption() {
@@ -158,12 +161,12 @@ static void test_corruption() {
 }
 
 static void test_decode_state() {
-  CHECK(decode_window_state(0x41) == WindowState::UNLOCKED);
-  CHECK(decode_window_state(0x01) == WindowState::LOCKED);
-  CHECK(decode_window_state(0x00) == WindowState::UNCHANGED);
-  CHECK(std::strcmp(window_state_to_string(WindowState::LOCKED), "locked") == 0);
-  CHECK(std::strcmp(window_state_to_string(WindowState::UNLOCKED), "unlocked") == 0);
-  CHECK(std::strcmp(window_state_to_string(WindowState::UNCHANGED), "unchanged") == 0);
+  CHECK(decode_handle_state(0x41) == HandleState::UNLOCKED);
+  CHECK(decode_handle_state(0x01) == HandleState::LOCKED);
+  CHECK(decode_handle_state(0x00) == HandleState::UNCHANGED);
+  CHECK(std::strcmp(handle_state_to_string(HandleState::LOCKED), "locked") == 0);
+  CHECK(std::strcmp(handle_state_to_string(HandleState::UNLOCKED), "unlocked") == 0);
+  CHECK(std::strcmp(handle_state_to_string(HandleState::UNCHANGED), "unchanged") == 0);
   SensorFrame other{};
   CHECK(std::strcmp(sensor_kind_to_string(other), "other") == 0);
 }
@@ -181,7 +184,7 @@ static void test_replay_capture() {
     if (!d.is_new(f.device_id, f.msg_no, c.t_ms))
       continue;
     char buf[32];
-    std::snprintf(buf, sizeof(buf), "%06X %s", static_cast<unsigned>(f.device_id), window_state_to_string(f.state));
+    std::snprintf(buf, sizeof(buf), "%06X %s", static_cast<unsigned>(f.device_id), handle_state_to_string(f.state));
     events.emplace_back(buf);
   }
   const std::vector<std::string> expected = {

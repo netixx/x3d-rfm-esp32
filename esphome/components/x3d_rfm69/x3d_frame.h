@@ -15,8 +15,12 @@ static constexpr size_t X3D_MAX_FRAME_LEN = 65;  // length byte + 64 byte payloa
 // handle: it reports locked / unlocked, not open / closed.
 static constexpr uint8_t DVI_STATE_UNLOCKED_BIT = 0x40;
 static constexpr uint8_t DVI_STATE_VALID_BIT = 0x01;
+// Flags byte (idx 8) when unlocked: 0x08 on a tilt-only (soufflet) window,
+// 0x04 on a sliding door. Read as Tydom's OPEN_HOPPER (tilt) vs UNLOCKED.
+// Not yet checked on a tilt-and-turn window.
+static constexpr uint8_t DVI_FLAG_TILT = 0x08;
 
-enum class WindowState : uint8_t {
+enum class HandleState : uint8_t {
   UNCHANGED = 0,  // "state not changed" message (state byte 0x00), maybe a heartbeat
   LOCKED,
   UNLOCKED,
@@ -36,11 +40,11 @@ struct SensorFrame {
   uint8_t length;      // idx 0, total frame length including length byte and CRC
   uint8_t msg_no;      // idx 2, rolling message number
   uint32_t device_id;  // idx 5..7, little endian
-  uint8_t flags;       // idx 8, 0x00 locked, 0x08 (window) / 0x04 (sliding) unlocked
+  uint8_t flags;       // idx 8, 0x00 locked, 0x08 tilt / 0x04 unlocked
   uint8_t state_byte;  // idx 9, 0x41 unlocked / 0x01 locked / 0x00 not changed
   uint8_t extra[8];    // idx 10 up to header checksum (82 00 20 00 00 or 82 00 40 00 00)
   uint8_t extra_len;
-  WindowState state;
+  HandleState state;
 };
 
 /// CRC-16/XMODEM: poly 0x1021, init 0x0000, not reflected, no final xor.
@@ -51,9 +55,12 @@ uint16_t crc16_xmodem(const uint8_t *data, size_t len);
 /// buf_len is the number of bytes available in buf; trailing garbage is ignored.
 ParseResult parse_sensor_frame(const uint8_t *buf, size_t buf_len, SensorFrame *out);
 
-WindowState decode_window_state(uint8_t state_byte);
+HandleState decode_handle_state(uint8_t state_byte);
 
-const char *window_state_to_string(WindowState state);
+const char *handle_state_to_string(HandleState state);
+
+/// Handle in tilt position (unlocked with the tilt flag).
+bool is_tilted(const SensorFrame &frame);
 
 /// Sensor kind from byte 12: 0x20 on a tilt (soufflet) window, 0x40 on a
 /// sliding door. Same split as Tydom's windowFrench / windowSliding.

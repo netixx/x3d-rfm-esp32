@@ -15,12 +15,13 @@
 
 namespace esphome::x3d_rfm69 {
 
-/// One window declared under `windows:`, owning its entities.
-class X3DWindow {
+/// One window or door declared under `openings:`, owning its entities.
+class X3DOpening {
  public:
-  X3DWindow(uint32_t device_id, const char *name) : device_id_(device_id), name_(name) {}
+  X3DOpening(uint32_t device_id, const char *name) : device_id_(device_id), name_(name) {}
 
   void set_lock_sensor(binary_sensor::BinarySensor *sensor) { this->lock_ = sensor; }
+  void set_tilt_sensor(binary_sensor::BinarySensor *sensor) { this->tilt_ = sensor; }
   void set_state_sensor(text_sensor::TextSensor *sensor) { this->state_ = sensor; }
   void set_rssi_sensor(sensor::Sensor *sensor) { this->rssi_ = sensor; }
 
@@ -28,12 +29,14 @@ class X3DWindow {
   const char *get_name() const { return this->name_; }
 
   void publish(const SensorFrame &frame, float rssi) {
-    if (frame.state != WindowState::UNCHANGED) {
+    if (frame.state != HandleState::UNCHANGED) {
       // Home Assistant lock device class: ON means unlocked.
       if (this->lock_ != nullptr)
-        this->lock_->publish_state(frame.state == WindowState::UNLOCKED);
+        this->lock_->publish_state(frame.state == HandleState::UNLOCKED);
+      if (this->tilt_ != nullptr)
+        this->tilt_->publish_state(is_tilted(frame));
       if (this->state_ != nullptr)
-        this->state_->publish_state(window_state_to_string(frame.state));
+        this->state_->publish_state(handle_state_to_string(frame.state));
     }
     if (this->rssi_ != nullptr)
       this->rssi_->publish_state(rssi);
@@ -43,6 +46,7 @@ class X3DWindow {
   uint32_t device_id_;
   const char *name_;
   binary_sensor::BinarySensor *lock_{nullptr};
+  binary_sensor::BinarySensor *tilt_{nullptr};
   text_sensor::TextSensor *state_{nullptr};
   sensor::Sensor *rssi_{nullptr};
 };
@@ -61,11 +65,11 @@ class X3DRFM69 : public Component,
   void set_log_unclaimed_devices(bool log) { this->log_unclaimed_devices_ = log; }
   void set_log_raw_frames(bool log) { this->log_raw_frames_ = log; }
 
-  void add_window(X3DWindow *window) { this->windows_.push_back(window); }
+  void add_opening(X3DOpening *window) { this->openings_.push_back(window); }
   /// Hub-wide text sensor showing the last event of any device (discovery).
   void set_last_frame_sensor(text_sensor::TextSensor *sensor) { this->last_frame_ = sensor; }
-  /// (device_id hex string, state, kind, rssi, raw frame hex), once per new event of any device.
-  Trigger<std::string, std::string, std::string, float, std::string> *get_window_event_trigger() {
+  /// (device_id hex string, state, tilted, kind, rssi, raw frame hex), once per new event of any device.
+  Trigger<std::string, std::string, bool, std::string, float, std::string> *get_opening_event_trigger() {
     return &this->event_trigger_;
   }
 
@@ -88,9 +92,9 @@ class X3DRFM69 : public Component,
   uint8_t mode_{0xff};
 
   Deduplicator dedup_;
-  std::vector<X3DWindow *> windows_;
+  std::vector<X3DOpening *> openings_;
   text_sensor::TextSensor *last_frame_{nullptr};
-  Trigger<std::string, std::string, std::string, float, std::string> event_trigger_;
+  Trigger<std::string, std::string, bool, std::string, float, std::string> event_trigger_;
 };
 
 }  // namespace esphome::x3d_rfm69

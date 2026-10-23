@@ -1,4 +1,4 @@
-"""Receive Delta Dore X3D window sensors (K-LINE DVI) with an RFM69 / SX1231."""
+"""Receive Delta Dore X3D lock detectors (K-LINE DVI) of windows and doors with an RFM69 / SX1231."""
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
@@ -25,20 +25,22 @@ MULTI_CONF = True
 CONF_DIO0_PIN = "dio0_pin"
 CONF_LOG_UNCLAIMED_DEVICES = "log_unclaimed_devices"
 CONF_LOG_RAW_FRAMES = "log_raw_frames"
-CONF_ON_WINDOW_EVENT = "on_window_event"
+CONF_ON_OPENING_EVENT = "on_opening_event"
 CONF_LAST_FRAME = "last_frame"
-CONF_WINDOWS = "windows"
+CONF_OPENINGS = "openings"
 CONF_DEVICE = "device"
 CONF_LOCK = "lock"
+CONF_TILT = "tilt"
 CONF_RSSI = "rssi"
 
 x3d_rfm69_ns = cg.esphome_ns.namespace("x3d_rfm69")
 X3DRFM69 = x3d_rfm69_ns.class_("X3DRFM69", cg.Component, spi.SPIDevice)
-X3DWindow = x3d_rfm69_ns.class_("X3DWindow")
+X3DOpening = x3d_rfm69_ns.class_("X3DOpening")
 
-# Entities of each window: config key -> (name suffix, name inside a sub-device, on by default)
-WINDOW_ENTITIES = {
+# Entities of each opening: config key -> (name suffix, name inside a sub-device, on by default)
+OPENING_ENTITIES = {
     CONF_LOCK: ("lock", "Lock", True),
+    CONF_TILT: ("tilted", "Tilted", False),
     CONF_STATE: ("state", "State", False),
     CONF_RSSI: ("RSSI", "RSSI", False),
 }
@@ -60,10 +62,10 @@ def x3d_device_id(value):
     return value
 
 
-def _fill_window_entities(value):
-    """Create the window entity configs, named after the window.
+def _fill_opening_entities(value):
+    """Create the entity configs of an opening (window or door), named after it.
 
-    `lock` is on by default, `state` and `rssi` with `true`. Each one takes entity
+    `lock` is on by default, `tilt`, `state` and `rssi` with `true`. Each one takes entity
     options, or `false` to disable it. With `device:`, entities go to that
     sub-device and are named "Lock", "State", "RSSI".
     """
@@ -72,7 +74,7 @@ def _fill_window_entities(value):
     value = dict(value)
     name = value.get(CONF_NAME)
     device = value.get(CONF_DEVICE)
-    for key, (suffix, sub_device_name, default_on) in WINDOW_ENTITIES.items():
+    for key, (suffix, sub_device_name, default_on) in OPENING_ENTITIES.items():
         entity = value.get(key, default_on)
         if entity is False:
             value.pop(key, None)
@@ -91,11 +93,11 @@ def _fill_window_entities(value):
     return value
 
 
-WINDOW_SCHEMA = cv.All(
-    _fill_window_entities,
+OPENING_SCHEMA = cv.All(
+    _fill_opening_entities,
     cv.Schema(
         {
-            cv.GenerateID(): cv.declare_id(X3DWindow),
+            cv.GenerateID(): cv.declare_id(X3DOpening),
             cv.Required(CONF_DEVICE_ID): x3d_device_id,
             cv.Required(CONF_NAME): cv.string_strict,
             # Optional sub-device declared under `esphome: devices:`
@@ -103,6 +105,10 @@ WINDOW_SCHEMA = cv.All(
             # Handle position. Home Assistant "lock" class: ON = unlocked
             cv.Optional(CONF_LOCK): binary_sensor.binary_sensor_schema(
                 device_class=DEVICE_CLASS_LOCK,
+            ),
+            # Handle in tilt position (tilt / tilt-and-turn windows). ON = tilted
+            cv.Optional(CONF_TILT): binary_sensor.binary_sensor_schema(
+                icon="mdi:window-open-variant",
             ),
             # locked / unlocked
             cv.Optional(CONF_STATE): text_sensor.text_sensor_schema(
@@ -121,14 +127,14 @@ WINDOW_SCHEMA = cv.All(
 )
 
 
-def _unique_device_ids(windows):
+def _unique_device_ids(openings):
     seen = set()
-    for window in windows:
-        device_id = window[CONF_DEVICE_ID]
+    for opening in openings:
+        device_id = opening[CONF_DEVICE_ID]
         if device_id in seen:
             raise cv.Invalid(f"Device 0x{device_id:06X} is declared twice")
         seen.add(device_id)
-    return windows
+    return openings
 
 
 CONFIG_SCHEMA = (
@@ -141,15 +147,15 @@ CONFIG_SCHEMA = (
             ),
             cv.Optional(CONF_LOG_UNCLAIMED_DEVICES, default=True): cv.boolean,
             cv.Optional(CONF_LOG_RAW_FRAMES, default=False): cv.boolean,
-            cv.Optional(CONF_WINDOWS, default=[]): cv.All(
-                cv.ensure_list(WINDOW_SCHEMA), _unique_device_ids
+            cv.Optional(CONF_OPENINGS, default=[]): cv.All(
+                cv.ensure_list(OPENING_SCHEMA), _unique_device_ids
             ),
             # Last event of any device, claimed or not: "EFCC85 'Tilt window': unlocked (...)"
             cv.Optional(CONF_LAST_FRAME): text_sensor.text_sensor_schema(
                 icon="mdi:radio-tower",
                 entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
             ),
-            cv.Optional(CONF_ON_WINDOW_EVENT): automation.validate_automation(
+            cv.Optional(CONF_ON_OPENING_EVENT): automation.validate_automation(
                 single=True
             ),
         }
@@ -171,36 +177,40 @@ async def to_code(config):
     cg.add(var.set_log_unclaimed_devices(config[CONF_LOG_UNCLAIMED_DEVICES]))
     cg.add(var.set_log_raw_frames(config[CONF_LOG_RAW_FRAMES]))
 
-    for window_config in config[CONF_WINDOWS]:
-        window = cg.new_Pvariable(
-            window_config[CONF_ID],
-            window_config[CONF_DEVICE_ID],
-            window_config[CONF_NAME],
+    for opening_config in config[CONF_OPENINGS]:
+        opening = cg.new_Pvariable(
+            opening_config[CONF_ID],
+            opening_config[CONF_DEVICE_ID],
+            opening_config[CONF_NAME],
         )
-        cg.add(var.add_window(window))
-        if lock_config := window_config.get(CONF_LOCK):
+        cg.add(var.add_opening(opening))
+        if lock_config := opening_config.get(CONF_LOCK):
             sens = await binary_sensor.new_binary_sensor(lock_config)
-            cg.add(window.set_lock_sensor(sens))
-        if state_config := window_config.get(CONF_STATE):
+            cg.add(opening.set_lock_sensor(sens))
+        if tilt_config := opening_config.get(CONF_TILT):
+            sens = await binary_sensor.new_binary_sensor(tilt_config)
+            cg.add(opening.set_tilt_sensor(sens))
+        if state_config := opening_config.get(CONF_STATE):
             sens = await text_sensor.new_text_sensor(state_config)
-            cg.add(window.set_state_sensor(sens))
-        if rssi_config := window_config.get(CONF_RSSI):
+            cg.add(opening.set_state_sensor(sens))
+        if rssi_config := opening_config.get(CONF_RSSI):
             sens = await sensor.new_sensor(rssi_config)
-            cg.add(window.set_rssi_sensor(sens))
+            cg.add(opening.set_rssi_sensor(sens))
 
     if last_frame_config := config.get(CONF_LAST_FRAME):
         sens = await text_sensor.new_text_sensor(last_frame_config)
         cg.add(var.set_last_frame_sensor(sens))
 
-    if CONF_ON_WINDOW_EVENT in config:
+    if CONF_ON_OPENING_EVENT in config:
         await automation.build_automation(
-            var.get_window_event_trigger(),
+            var.get_opening_event_trigger(),
             [
                 (cg.std_string, "device_id"),
                 (cg.std_string, "state"),
+                (cg.bool_, "tilted"),
                 (cg.std_string, "kind"),
                 (cg.float_, "rssi"),
                 (cg.std_string, "raw"),
             ],
-            config[CONF_ON_WINDOW_EVENT],
+            config[CONF_ON_OPENING_EVENT],
         )

@@ -1,10 +1,11 @@
-# ESPHome component: Delta Dore X3D window sensors (K•LINE DVI)
+# ESPHome component: Delta Dore X3D lock detectors (K•LINE DVI)
 
 `x3d_rfm69` is an ESPHome external component that listens to Delta Dore **X3D**
 868 MHz radio traffic with an **RFM69HW (SX1231)** on an **ESP32**, and decodes
-the messages of K•LINE DVI sensors (Détecteur de Verrouillage Intégré). The DVI
-reads the window or door handle and reports **locked** or **unlocked**. Opening
-the sash doesn't send anything.
+the messages of K•LINE DVI sensors (Détecteur de Verrouillage Intégré) built
+into windows and doors, called *openings* here ("ouvrants"). The DVI reads the
+handle and reports **locked** or **unlocked**, plus the **tilt** position on
+tilt windows. Opening the sash doesn't send anything.
 
 It only receives. It doesn't pair or transmit, so it doesn't interfere with an
 existing Delta Dore / Tydom installation.
@@ -46,76 +47,37 @@ esphome run x3d-dvi.yaml
 
 On NixOS, `nix-shell -p esphome --run "esphome run x3d-dvi.yaml"` is enough.
 
-## Getting windows into Home Assistant
+## Declaring openings
 
-ESPHome entities are created at compile time, so the firmware can't add a new
-entity on its own when a new window shows up. There are two ways to get
-your windows into Home Assistant. You can use both at the same time.
-
-### A. Map the IDs in Home Assistant (no reflash per window)
-
-`on_window_event` fires once per real event of **any** device (the 3 radio
-repeats are dropped). The demo forwards it as a Home Assistant event:
+List each window or door once, with its ID and a name:
 
 ```yaml
 x3d_rfm69:
-  on_window_event:
-    - homeassistant.event:
-        event: esphome.x3d_window
-        data:
-          device_id: !lambda "return device_id;"
-          state: !lambda "return state;"
-          kind: !lambda "return kind;"
-          rssi: !lambda 'return str_sprintf("%.1f", rssi);'
-```
-
-Event data: `device_id` (for example `EFCC85`), `state` (`locked`,
-`unlocked`, or `unchanged`), `kind` (`window`, `sliding`, or `other`), and
-`rssi`. Watch them live
-in Home Assistant under *Developer tools → Events → Listen to
-`esphome.x3d_window`*.
-
-[`homeassistant/x3d_windows.yaml`](homeassistant/x3d_windows.yaml) turns these
-events into trigger-based template entities: one block per window, with the ID
-and names set in Home Assistant. Paste its `template:` block into
-`configuration.yaml`, or drop the file in `<config>/packages/` if you use
-[packages](https://www.home-assistant.io/docs/configuration/packages/). Those
-entities keep their state across Home Assistant restarts. While Home Assistant
-is disconnected from the ESP, events are lost; the window catches up on its
-next change.
-
-Events whose name starts with `esphome.` are accepted from any ESPHome
-device. You don't need to enable "Allow the device to perform Home Assistant
-actions".
-
-### B. Map the IDs in ESPHome (native entities)
-
-List each window once, with its ID and a name:
-
-```yaml
-x3d_rfm69:
-  # ...
-  windows:
+  cs_pin: GPIO5
+  dio0_pin: GPIO4
+  openings:
     - device_id: 0xEFCC85
       name: "Tilt window"
+      tilt: true
     - device_id: 0xEFA00B
       name: "Sliding door"
 ```
 
-Each window gets one binary sensor, `<name> lock` (device class `lock`:
-ON = unlocked). Two more entities are available per window:
+Each entry is expanded into regular ESPHome entities, so filters, automations
+(`on_state`, ...), `internal` and the other entity options work as usual:
 
-| Key     | Entity                | Default | Content                                      |
-|---------|-----------------------|---------|----------------------------------------------|
-| `lock`  | `<name> lock` binary sensor | on | ON = unlocked                             |
-| `state` | `<name> state` text sensor  | off | `locked` / `unlocked`                     |
-| `rssi`  | `<name> RSSI` sensor        | off | dBm, updated on each event: acts as "last seen" |
+| Key     | Entity                         | Default | Content                                   |
+|---------|--------------------------------|---------|-------------------------------------------|
+| `lock`  | `<name> lock` binary sensor    | on      | Shown as *Locked* / *Unlocked* in HA      |
+| `tilt`  | `<name> tilted` binary sensor  | off     | ON when the handle is in tilt position    |
+| `state` | `<name> state` text sensor     | off     | `locked` / `unlocked`                     |
+| `rssi`  | `<name> RSSI` sensor           | off     | dBm, updated on each event: acts as "last seen" |
 
 Set a key to `true` to enable it, `false` to disable it, or give it entity
-options (`name`, `icon`, `internal`, filters, ...):
+options:
 
 ```yaml
-  windows:
+  openings:
     - device_id: 0xEFA00B
       name: "Sliding door"
       rssi: true
@@ -123,12 +85,20 @@ options (`name`, `icon`, `internal`, filters, ...):
         name: "Sliding door handle"
 ```
 
+The `lock` binary sensor uses Home Assistant's `lock` device class. HA displays
+it as *Locked* / *Unlocked*; its raw value is ON when unlocked (HA's
+convention for this class).
+
+`tilt` is only useful on tilt windows (soufflet, tilt-and-turn). The radio ID
+doesn't say what kind of opening a detector is fitted to, so you enable it per
+opening. The tilt position itself is read from the frames.
+
 `device_id` accepts `0xEFCC85` or `"EFCC85"` (as printed in the logs).
 
-To show each window as its own device in Home Assistant (with its own area),
+To show each opening as its own device in Home Assistant (with its own area),
 declare a [sub-device](https://esphome.io/components/esphome/#sub-devices) and
-reference it with `device:`. Its entities are then named `Lock`, `State` and
-`RSSI` inside that device:
+reference it with `device:`. Its entities are then named `Lock`, `Tilted`,
+`State` and `RSSI` inside that device:
 
 ```yaml
 esphome:
@@ -138,37 +108,38 @@ esphome:
       area_id: bathroom      # optional, from esphome: areas:
 
 x3d_rfm69:
-  windows:
+  openings:
     - device_id: 0xEFCC85
       name: "Tilt window"
       device: tilt_window
+      tilt: true
 ```
 
 ## Finding device IDs
 
 Flash with `log_unclaimed_devices: true` (the default), then turn each handle
-one window at a time. Devices not listed under `windows:` (*unclaimed*) are
+one opening at a time. Devices not listed under `openings:` (*unclaimed*) are
 logged at INFO, so they stand out:
 
 ```
-[I][x3d_rfm69]: Unclaimed device 0xEFCC85 (window): unlocked, -67.5 dBm -> add it under 'windows:' with 'device_id: 0xEFCC85'
+[I][x3d_rfm69]: Unclaimed device 0xEFCC85 (window): unlocked (tilt), -67.5 dBm -> add it under 'openings:' with 'device_id: 0xEFCC85'
 ```
 
-Once claimed, the device is logged at DEBUG with its window name:
+Once claimed, the device is logged at DEBUG with its name:
 
 ```
-[D][x3d_rfm69]: 'Tilt window' (0xEFCC85, window): unlocked, -67.5 dBm
+[D][x3d_rfm69]: 'Tilt window' (0xEFCC85, window): unlocked (tilt), -67.5 dBm
 [D][x3d_rfm69]: 'Sliding door' (0xEFA00B, sliding): state unchanged (no handle position in this frame), keeping current value, -71.0 dBm
 ```
 
 Wording used everywhere: a device is *claimed* or *unclaimed* (listed under
-`windows:` or not); its state is `locked`, `unlocked`, or `unchanged` (a frame
+`openings:` or not); its state is `locked`, `unlocked`, or `unchanged` (a frame
 with no handle position, for example `00 00` in bytes 8-9); its kind is
 `window`, `sliding`, or `other`.
 
 The hub's `last_frame` text sensor shows the last event of any device in Home
-Assistant, for example `EFCC85 'Tilt window': unlocked (window, -67.5 dBm)` or
-`EFA055 unclaimed: locked (sliding, -70.0 dBm)`:
+Assistant, for example `EFCC85 'Tilt window': unlocked (tilt) (window, -67.5 dBm)`
+or `EFA055 unclaimed: locked (sliding, -70.0 dBm)`:
 
 ```yaml
 x3d_rfm69:
@@ -185,6 +156,38 @@ Log levels:
 | DEBUG   | Events of claimed devices, every raw packet with `log_raw_frames`    |
 | VERBOSE | Raw bytes of each event, radio repeats, ignored non-sensor X3D traffic |
 
+## Mapping IDs in Home Assistant instead (no reflash per opening)
+
+`on_opening_event` fires once per real event of **any** device (the radio
+repeats are dropped). The demo forwards it as a Home Assistant event:
+
+```yaml
+x3d_rfm69:
+  on_opening_event:
+    - homeassistant.event:
+        event: esphome.x3d_opening
+        data:
+          device_id: !lambda "return device_id;"
+          state: !lambda "return state;"
+          tilted: !lambda 'return tilted ? "true" : "false";'
+          kind: !lambda "return kind;"
+          rssi: !lambda 'return str_sprintf("%.1f", rssi);'
+```
+
+Watch the events in Home Assistant under *Developer tools → Events → Listen to
+`esphome.x3d_opening`*.
+[`homeassistant/x3d_openings.yaml`](homeassistant/x3d_openings.yaml) turns
+them into trigger-based template entities, one block per opening. Paste its
+`template:` block into `configuration.yaml`, or drop the file in
+`<config>/packages/` if you use
+[packages](https://www.home-assistant.io/docs/configuration/packages/). Those
+entities keep their state across Home Assistant restarts. While Home Assistant
+is disconnected from the ESP, events are lost; the opening catches up on its
+next change.
+
+Events whose name starts with `esphome.` are accepted from any ESPHome device.
+You don't need to enable "Allow the device to perform Home Assistant actions".
+
 ## Hub options
 
 ```yaml
@@ -196,8 +199,8 @@ x3d_rfm69:
   log_unclaimed_devices: true
   log_raw_frames: false    # log every packet received, including other X3D traffic
   last_frame: ...          # optional text sensor, last event of any device
-  windows: ...             # claimed devices and their entities
-  on_window_event: ...     # variables: device_id, state, kind, rssi, raw
+  openings: ...            # claimed devices and their entities
+  on_opening_event: ...    # variables: device_id, state, tilted, kind, rssi, raw
 ```
 
 ## Decoding notes
@@ -205,7 +208,7 @@ x3d_rfm69:
 - RF: FSK 40 kbps, 80 kHz deviation, sync `81 69 96 7e`, hardware whitening.
   The SX1231 register setup is a straight port of `x3d-raw-monitor`.
 - CRC: CRC-16/XMODEM (poly `0x1021`, init `0x0000`) over the length byte and
-  payload, stored big endian. It matches both reference captures.
+  payload, stored big endian.
 - Header checksum: `0x10000 - sum(device id .. byte before checksum)`, big
   endian, checked as well.
 - Frame bytes 8-14, from captures of a tilt (soufflet) window and a sliding
@@ -217,11 +220,13 @@ x3d_rfm69:
   | Sliding door      | `00 01 82 00 40 00 00` | `04 41 82 00 40 00 00` |
 
   State comes from byte 9: bit `0x40` = unlocked, `0x01` = locked, `0x00` =
-  "not changed" (entities keep their value). Byte 12 gives the `kind`:
-  `0x20` window, `0x40` sliding. That matches Tydom's `windowFrench` /
-  `windowSliding` device types. Tydom reports `LOCKED` / `OPEN_FRENCH` /
-  `OPEN_HOPPER` for French windows, so a tilt-and-turn window may use another
-  byte 8 value in the tilt position. Captures welcome.
+  "not changed" (entities keep their value). Byte 8 bit `0x08` is read as the
+  tilt position (Tydom's `OPEN_HOPPER`), `0x04` as a plain unlock. Byte 12 gives
+  the `kind`: `0x20` window, `0x40` sliding, matching Tydom's `windowFrench` /
+  `windowSliding` device types.
+- Not captured yet: a tilt-and-turn window with the handle horizontal (turn
+  position, Tydom's `OPEN_FRENCH`). If it also sets `0x08`, the tilt sensor
+  would be wrong on those windows. Captures welcome.
 - Each event is sent 3 times ~20 ms apart, then the same burst again
   ~3.5-5.3 s later. Both are dropped by message number for 30 s.
 - Values in bytes 8-14 that don't match the table (possibly battery low or
@@ -229,8 +234,8 @@ x3d_rfm69:
 
 ## Tests
 
-Host-side unit tests for the parser (CRC, header checksum, state decoding,
-de-duplication), with no hardware needed:
+Host-side unit tests for the parser (CRC, header checksum, state and tilt
+decoding, de-duplication, replay of real captures), with no hardware needed:
 
 ```sh
 make -C esphome/tests
