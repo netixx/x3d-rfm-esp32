@@ -6,30 +6,45 @@
 #include "esphome/core/automation.h"
 #include "esphome/core/component.h"
 #include "esphome/core/hal.h"
+#include "esphome/components/binary_sensor/binary_sensor.h"
+#include "esphome/components/sensor/sensor.h"
 #include "esphome/components/spi/spi.h"
+#include "esphome/components/text_sensor/text_sensor.h"
 
 #include "x3d_frame.h"
 
 namespace esphome::x3d_rfm69 {
 
-/// Decoded event, handed to listeners once per new (device, msg#).
-struct WindowEvent {
-  const SensorFrame &frame;
-  float rssi;
-};
-
-/// Receives events of one device, or of every device when ANY_DEVICE is used.
-class X3DListener {
+/// One window declared under `windows:`, owning its entities.
+class X3DWindow {
  public:
-  static constexpr uint32_t ANY_DEVICE = 0xFFFFFFFF;
+  X3DWindow(uint32_t device_id, const char *name) : device_id_(device_id), name_(name) {}
 
-  explicit X3DListener(uint32_t device_id) : device_id_(device_id) {}
+  void set_lock_sensor(binary_sensor::BinarySensor *sensor) { this->lock_ = sensor; }
+  void set_state_sensor(text_sensor::TextSensor *sensor) { this->state_ = sensor; }
+  void set_rssi_sensor(sensor::Sensor *sensor) { this->rssi_ = sensor; }
+
   uint32_t get_device_id() const { return this->device_id_; }
-  bool is_any_device() const { return this->device_id_ == ANY_DEVICE; }
-  virtual void on_window_event(const WindowEvent &event) = 0;
+  const char *get_name() const { return this->name_; }
+
+  void publish(const SensorFrame &frame, float rssi) {
+    if (frame.state != WindowState::UNCHANGED) {
+      // Home Assistant lock device class: ON means unlocked.
+      if (this->lock_ != nullptr)
+        this->lock_->publish_state(frame.state == WindowState::UNLOCKED);
+      if (this->state_ != nullptr)
+        this->state_->publish_state(window_state_to_string(frame.state));
+    }
+    if (this->rssi_ != nullptr)
+      this->rssi_->publish_state(rssi);
+  }
 
  protected:
   uint32_t device_id_;
+  const char *name_;
+  binary_sensor::BinarySensor *lock_{nullptr};
+  text_sensor::TextSensor *state_{nullptr};
+  sensor::Sensor *rssi_{nullptr};
 };
 
 class X3DRFM69 : public Component,
@@ -43,10 +58,12 @@ class X3DRFM69 : public Component,
 
   void set_dio0_pin(InternalGPIOPin *pin) { this->dio0_pin_ = pin; }
   void set_frequency(uint32_t frequency) { this->frequency_ = frequency; }
-  void set_log_unknown_devices(bool log) { this->log_unknown_devices_ = log; }
+  void set_log_unclaimed_devices(bool log) { this->log_unclaimed_devices_ = log; }
   void set_log_raw_frames(bool log) { this->log_raw_frames_ = log; }
 
-  void register_listener(X3DListener *listener);
+  void add_window(X3DWindow *window) { this->windows_.push_back(window); }
+  /// Hub-wide text sensor showing the last event of any device (discovery).
+  void set_last_frame_sensor(text_sensor::TextSensor *sensor) { this->last_frame_ = sensor; }
   /// (device_id hex string, state, kind, rssi, raw frame hex), once per new event of any device.
   Trigger<std::string, std::string, std::string, float, std::string> *get_window_event_trigger() {
     return &this->event_trigger_;
@@ -66,12 +83,13 @@ class X3DRFM69 : public Component,
 
   InternalGPIOPin *dio0_pin_{nullptr};
   uint32_t frequency_{868950000};
-  bool log_unknown_devices_{true};
+  bool log_unclaimed_devices_{true};
   bool log_raw_frames_{false};
   uint8_t mode_{0xff};
 
   Deduplicator dedup_;
-  std::vector<X3DListener *> listeners_;
+  std::vector<X3DWindow *> windows_;
+  text_sensor::TextSensor *last_frame_{nullptr};
   Trigger<std::string, std::string, std::string, float, std::string> event_trigger_;
 };
 

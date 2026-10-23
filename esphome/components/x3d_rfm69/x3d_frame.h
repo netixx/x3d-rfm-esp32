@@ -17,7 +17,7 @@ static constexpr uint8_t DVI_STATE_UNLOCKED_BIT = 0x40;
 static constexpr uint8_t DVI_STATE_VALID_BIT = 0x01;
 
 enum class WindowState : uint8_t {
-  UNKNOWN = 0,  // "state not changed" message (state byte 0x00)
+  UNCHANGED = 0,  // "state not changed" message (state byte 0x00), maybe a heartbeat
   LOCKED,
   UNLOCKED,
 };

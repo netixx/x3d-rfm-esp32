@@ -252,41 +252,55 @@ void X3DRFM69::handle_frame_(const uint8_t *buf, size_t len, float rssi) {
   const char *state_str = window_state_to_string(frame.state);
   const char *kind_str = sensor_kind_to_string(frame);
 
-  bool known = false;
-  for (auto *listener : this->listeners_) {
-    if (listener->get_device_id() == frame.device_id) {
-      known = true;
+  X3DWindow *window = nullptr;
+  for (auto *w : this->windows_) {
+    if (w->get_device_id() == frame.device_id) {
+      window = w;
       break;
     }
   }
 
-  // INFO only for devices not claimed in the YAML, so they stand out while discovering.
-  if (!known && this->log_unknown_devices_) {
-    ESP_LOGI(TAG, "Unclaimed device 0x%s (%s): %s, %.1f dBm -> add 'device_id: 0x%s' to claim it", id_str, kind_str,
-             state_str, rssi, id_str);
+  if (window == nullptr) {
+    // INFO only for unclaimed devices, so they stand out while discovering.
+    if (this->log_unclaimed_devices_) {
+      if (frame.state == WindowState::UNCHANGED) {
+        ESP_LOGI(TAG, "Unclaimed device 0x%s (%s): state unchanged (no handle position in this frame), %.1f dBm -> "
+                 "add it under 'windows:' with 'device_id: 0x%s'", id_str, kind_str, rssi, id_str);
+      } else {
+        ESP_LOGI(TAG, "Unclaimed device 0x%s (%s): %s, %.1f dBm -> add it under 'windows:' with 'device_id: 0x%s'",
+                 id_str, kind_str, state_str, rssi, id_str);
+      }
+    }
+  } else if (frame.state == WindowState::UNCHANGED) {
+    ESP_LOGD(TAG, "'%s' (0x%s, %s): state unchanged (no handle position in this frame), keeping current value, "
+             "%.1f dBm", window->get_name(), id_str, kind_str, rssi);
   } else {
-    ESP_LOGD(TAG, "Device 0x%s (%s): %s, %.1f dBm", id_str, kind_str, state_str, rssi);
+    ESP_LOGD(TAG, "'%s' (0x%s, %s): %s, %.1f dBm", window->get_name(), id_str, kind_str, state_str, rssi);
   }
   ESP_LOGV(TAG, "Device 0x%s msg 0x%02X, bytes 8-9: %02X %02X, raw: %s", id_str, frame.msg_no, frame.flags,
            frame.state_byte, raw.c_str());
 
-  if (frame.state == WindowState::UNKNOWN) {
-    ESP_LOGV(TAG, "Device 0x%s: state byte 0x%02X means \"not changed\", entities keep their value", id_str,
-             frame.state_byte);
+  if (has_unexpected_bits(frame)) {
+    ESP_LOGW(TAG, "Device 0x%s%s%s%s: unexpected bits in bytes 8-14, please report. raw: %s", id_str,
+             window != nullptr ? " '" : "", window != nullptr ? window->get_name() : "", window != nullptr ? "'" : "",
+             raw.c_str());
   }
-  if (has_unexpected_bits(frame))
-    ESP_LOGW(TAG, "Device 0x%s: unexpected bits in bytes 8-14, please report. raw: %s", id_str, raw.c_str());
 
-  WindowEvent event{frame, rssi};
-  for (auto *listener : this->listeners_) {
-    if (listener->is_any_device() || listener->get_device_id() == frame.device_id)
-      listener->on_window_event(event);
+  if (window != nullptr)
+    window->publish(frame, rssi);
+  if (this->last_frame_ != nullptr) {
+    // "EFCC85 'Tilt window': unlocked (window, -67.5 dBm)" or "EFA00B unclaimed: locked (sliding, -71.0 dBm)"
+    char text[128];
+    if (window != nullptr) {
+      snprintf(text, sizeof(text), "%s '%s': %s (%s, %.1f dBm)", id_str, window->get_name(), state_str, kind_str, rssi);
+    } else {
+      snprintf(text, sizeof(text), "%s unclaimed: %s (%s, %.1f dBm)", id_str, state_str, kind_str, rssi);
+    }
+    this->last_frame_->publish_state(text);
   }
 
   this->event_trigger_.trigger(std::string(id_str), std::string(state_str), std::string(kind_str), rssi, raw);
 }
-
-void X3DRFM69::register_listener(X3DListener *listener) { this->listeners_.push_back(listener); }
 
 void X3DRFM69::dump_config() {
   ESP_LOGCONFIG(TAG, "X3D RFM69 (SX1231) receiver:");
@@ -294,11 +308,11 @@ void X3DRFM69::dump_config() {
   LOG_PIN("  DIO0 Pin: ", this->dio0_pin_);
   ESP_LOGCONFIG(TAG,
                 "  Frequency: %" PRIu32 " Hz\n"
-                "  Log unknown devices: %s\n"
+                "  Log unclaimed devices: %s\n"
                 "  Log raw frames: %s\n"
-                "  Listeners: %u",
-                this->frequency_, YESNO(this->log_unknown_devices_), YESNO(this->log_raw_frames_),
-                static_cast<unsigned>(this->listeners_.size()));
+                "  Windows: %u",
+                this->frequency_, YESNO(this->log_unclaimed_devices_), YESNO(this->log_raw_frames_),
+                static_cast<unsigned>(this->windows_.size()));
   if (this->is_failed())
     ESP_LOGE(TAG, "  Radio initialisation failed, see earlier log");
 }

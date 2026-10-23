@@ -101,7 +101,7 @@ static void test_parse_not_changed() {
   SensorFrame f{};
   CHECK(parse_sensor_frame(FRAME_NOT_CHANGED, sizeof(FRAME_NOT_CHANGED), &f) == ParseResult::OK);
   CHECK(f.device_id == 0xEFA055);
-  CHECK(f.state == WindowState::UNKNOWN);
+  CHECK(f.state == WindowState::UNCHANGED);
   CHECK(!has_unexpected_bits(f));
 }
 
@@ -160,9 +160,12 @@ static void test_corruption() {
 static void test_decode_state() {
   CHECK(decode_window_state(0x41) == WindowState::UNLOCKED);
   CHECK(decode_window_state(0x01) == WindowState::LOCKED);
-  CHECK(decode_window_state(0x00) == WindowState::UNKNOWN);
+  CHECK(decode_window_state(0x00) == WindowState::UNCHANGED);
   CHECK(std::strcmp(window_state_to_string(WindowState::LOCKED), "locked") == 0);
   CHECK(std::strcmp(window_state_to_string(WindowState::UNLOCKED), "unlocked") == 0);
+  CHECK(std::strcmp(window_state_to_string(WindowState::UNCHANGED), "unchanged") == 0);
+  SensorFrame other{};
+  CHECK(std::strcmp(sensor_kind_to_string(other), "other") == 0);
 }
 
 // Replay the whole capture: repeats and the second burst must collapse to one event each.

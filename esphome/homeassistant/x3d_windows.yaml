@@ -20,7 +20,7 @@ template:
           device_id: "EFCC85"
     conditions:
       - condition: template
-        value_template: "{{ trigger.event.data.state != 'unknown' }}"
+        value_template: "{{ trigger.event.data.state != 'unchanged' }}"
     binary_sensor:
       - name: "Tilt window lock"
         unique_id: x3d_efcc85_lock
@@ -36,7 +36,7 @@ template:
           device_id: "EFA00B"
     conditions:
       - condition: template
-        value_template: "{{ trigger.event.data.state != 'unknown' }}"
+        value_template: "{{ trigger.event.data.state != 'unchanged' }}"
     binary_sensor:
       - name: "Sliding door lock"
         unique_id: x3d_efa00b_lock

@@ -85,7 +85,7 @@ WindowState decode_window_state(uint8_t state_byte) {
     return WindowState::UNLOCKED;
   if (state_byte & DVI_STATE_VALID_BIT)
     return WindowState::LOCKED;
-  return WindowState::UNKNOWN;
+  return WindowState::UNCHANGED;
 }
 
 const char *window_state_to_string(WindowState state) {
@@ -95,7 +95,7 @@ const char *window_state_to_string(WindowState state) {
     case WindowState::UNLOCKED:
       return "unlocked";
     default:
-      return "unknown";
+      return "unchanged";
   }
 }
 
@@ -106,7 +106,7 @@ const char *sensor_kind_to_string(const SensorFrame &frame) {
     if (frame.extra[2] == 0x40)
       return "sliding";
   }
-  return "unknown";
+  return "other";
 }
 
 const char *parse_result_to_string(ParseResult result) {

@@ -5,8 +5,8 @@
 #  A. Map IDs in Home Assistant: every event of every device is sent as an
 #     "esphome.x3d_window" HA event. See homeassistant/x3d_windows.yaml.
 #     Adding a window needs no reflash.
-#  B. Map IDs here: declare each window with its device_id, ESPHome creates
-#     native entities (lock, state, RSSI).
+#  B. Map IDs here: list each window under "windows:" with its device_id and
+#     name, ESPHome creates native entities (lock, state, RSSI).
 #
 # The DVI reads the window handle: it reports locked / unlocked only.
 # Opening the sash doesn't send anything.
@@ -49,14 +49,27 @@ x3d_rfm69:
   cs_pin: GPIO5
   dio0_pin: GPIO4
   frequency: 868.95MHz
-  # Discovery: log events of devices not claimed below at INFO, with their ID.
-  # Claimed devices log at DEBUG.
-  log_unknown_devices: true
+  # Discovery: log events of devices not listed under "windows:" at INFO,
+  # with their ID. Listed (claimed) devices log at DEBUG.
+  log_unclaimed_devices: true
   # Log every raw packet received (noisy, for debugging only).
   log_raw_frames: false
+  # Last event of any device: turn each handle and read its ID here or in the logs.
+  last_frame:
+    name: "Last X3D frame"
+  # Option B: one entry per window, device_id taken from the logs / "Last X3D frame".
+  # Creates the binary sensor "<name> lock" (ON = unlocked). Optional:
+  # "state: true" (text: locked / unlocked) and "rssi: true" (signal, dBm).
+  # Each key also takes entity options (icon, internal, ...); "lock: false" disables it.
+  windows:
+    - device_id: 0xEFCC85
+      name: "Tilt window"
+    - device_id: 0xEFA00B
+      name: "Sliding door"
+      rssi: true
   # Option A: forward every event to Home Assistant, once per real event
   # (radio repeats are dropped). Variables: device_id ("EFCC85"),
-  # state (locked / unlocked / unknown), kind (window / sliding / unknown),
+  # state (locked / unlocked / unchanged), kind (window / sliding / other),
   # rssi (dBm), raw (hex).
   on_window_event:
     - homeassistant.event:
@@ -66,42 +79,3 @@ x3d_rfm69:
           state: !lambda "return state;"
           kind: !lambda "return kind;"
           rssi: !lambda "return str_sprintf(\"%.1f\", rssi);"
-
-text_sensor:
-  # Last event of any device: lock/unlock each handle and read its ID here or in the logs.
-  - platform: x3d_rfm69
-    last_frame:
-      name: "Last X3D frame"
-
-  # Option B: one block per window, device_id taken from the logs / "Last X3D frame".
-  - platform: x3d_rfm69
-    device_id: 0xEFCC85
-    state:
-      name: "Tilt window state" # locked / unlocked
-
-  - platform: x3d_rfm69
-    device_id: 0xEFA00B
-    state:
-      name: "Sliding door state"
-
-binary_sensor:
-  - platform: x3d_rfm69
-    device_id: 0xEFCC85
-    lock:
-      name: "Tilt window lock" # ON = unlocked
-
-  - platform: x3d_rfm69
-    device_id: 0xEFA00B
-    lock:
-      name: "Sliding door lock"
-
-sensor:
-  - platform: x3d_rfm69
-    device_id: 0xEFCC85
-    rssi:
-      name: "Tilt window RSSI"
-
-  - platform: x3d_rfm69
-    device_id: 0xEFA00B
-    rssi:
-      name: "Sliding door RSSI"

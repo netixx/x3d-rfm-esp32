@@ -49,7 +49,7 @@ On NixOS, `nix-shell -p esphome --run "esphome run x3d-dvi.yaml"` is enough.
 ## Getting windows into Home Assistant
 
 ESPHome entities are created at compile time, so the firmware can't add a new
-entity on its own when an unknown window shows up. There are two ways to get
+entity on its own when a new window shows up. There are two ways to get
 your windows into Home Assistant. You can use both at the same time.
 
 ### A. Map the IDs in Home Assistant (no reflash per window)
@@ -70,7 +70,7 @@ x3d_rfm69:
 ```
 
 Event data: `device_id` (for example `EFCC85`), `state` (`locked`,
-`unlocked`, or `unknown`), `kind` (`window`, `sliding`, or `unknown`), and
+`unlocked`, or `unchanged`), `kind` (`window`, `sliding`, or `other`), and
 `rssi`. Watch them live
 in Home Assistant under *Developer tools → Events → Listen to
 `esphome.x3d_window`*.
@@ -90,69 +90,113 @@ actions".
 
 ### B. Map the IDs in ESPHome (native entities)
 
-Declare each window with its ID:
+List each window once, with its ID and a name:
 
 ```yaml
-binary_sensor:
-  - platform: x3d_rfm69
-    device_id: 0xEFCC85
-    lock:
-      name: "Tilt window lock"         # ON = unlocked (device_class lock)
+x3d_rfm69:
+  # ...
+  windows:
+    - device_id: 0xEFCC85
+      name: "Tilt window"
+    - device_id: 0xEFA00B
+      name: "Sliding door"
+```
 
-text_sensor:
-  - platform: x3d_rfm69
-    device_id: 0xEFCC85
-    state:
-      name: "Tilt window state"        # locked / unlocked
+Each window gets one binary sensor, `<name> lock` (device class `lock`:
+ON = unlocked). Two more entities are available per window:
 
-sensor:
-  - platform: x3d_rfm69
-    device_id: 0xEFCC85
-    rssi:
-      name: "Tilt window RSSI"         # updated on each event: acts as "last seen"
+| Key     | Entity                | Default | Content                                      |
+|---------|-----------------------|---------|----------------------------------------------|
+| `lock`  | `<name> lock` binary sensor | on | ON = unlocked                             |
+| `state` | `<name> state` text sensor  | off | `locked` / `unlocked`                     |
+| `rssi`  | `<name> RSSI` sensor        | off | dBm, updated on each event: acts as "last seen" |
+
+Set a key to `true` to enable it, `false` to disable it, or give it entity
+options (`name`, `icon`, `internal`, filters, ...):
+
+```yaml
+  windows:
+    - device_id: 0xEFA00B
+      name: "Sliding door"
+      rssi: true
+      lock:
+        name: "Sliding door handle"
 ```
 
 `device_id` accepts `0xEFCC85` or `"EFCC85"` (as printed in the logs).
 
+To show each window as its own device in Home Assistant (with its own area),
+declare a [sub-device](https://esphome.io/components/esphome/#sub-devices) and
+reference it with `device:`. Its entities are then named `Lock`, `State` and
+`RSSI` inside that device:
+
+```yaml
+esphome:
+  devices:
+    - id: tilt_window
+      name: "Tilt window"
+      area_id: bathroom      # optional, from esphome: areas:
+
+x3d_rfm69:
+  windows:
+    - device_id: 0xEFCC85
+      name: "Tilt window"
+      device: tilt_window
+```
+
 ## Finding device IDs
 
-Flash with `log_unknown_devices: true` (the default), then turn each handle
-one window at a time. Devices not claimed by a `device_id` in your YAML are
+Flash with `log_unclaimed_devices: true` (the default), then turn each handle
+one window at a time. Devices not listed under `windows:` (*unclaimed*) are
 logged at INFO, so they stand out:
 
 ```
-[I][x3d_rfm69]: Unclaimed device 0xEFCC85 (window): unlocked, -67.5 dBm -> add 'device_id: 0xEFCC85' to claim it
+[I][x3d_rfm69]: Unclaimed device 0xEFCC85 (window): unlocked, -67.5 dBm -> add it under 'windows:' with 'device_id: 0xEFCC85'
 ```
 
-The hub-wide `last_frame` text sensor shows every device in Home Assistant
-(`EFCC85 unlocked (window, msg 0x55, -67.5 dBm)`):
+Once claimed, the device is logged at DEBUG with its window name:
+
+```
+[D][x3d_rfm69]: 'Tilt window' (0xEFCC85, window): unlocked, -67.5 dBm
+[D][x3d_rfm69]: 'Sliding door' (0xEFA00B, sliding): state unchanged (no handle position in this frame), keeping current value, -71.0 dBm
+```
+
+Wording used everywhere: a device is *claimed* or *unclaimed* (listed under
+`windows:` or not); its state is `locked`, `unlocked`, or `unchanged` (a frame
+with no handle position, for example `00 00` in bytes 8-9); its kind is
+`window`, `sliding`, or `other`.
+
+The hub's `last_frame` text sensor shows the last event of any device in Home
+Assistant, for example `EFCC85 'Tilt window': unlocked (window, -67.5 dBm)` or
+`EFA055 unclaimed: locked (sliding, -70.0 dBm)`:
 
 ```yaml
-text_sensor:
-  - platform: x3d_rfm69
-    last_frame:
-      name: "Last X3D frame"
+x3d_rfm69:
+  last_frame:
+    name: "Last X3D frame"
 ```
 
 Log levels:
 
 | Level   | What                                                                 |
 |---------|----------------------------------------------------------------------|
-| INFO    | Events of unclaimed devices (with `log_unknown_devices: true`)       |
+| INFO    | Events of unclaimed devices (with `log_unclaimed_devices: true`)     |
 | WARN    | Unexpected values in bytes 8-14, with the raw frame                  |
-| DEBUG   | Events of claimed devices, every raw packet with `log_raw_frames`     |
+| DEBUG   | Events of claimed devices, every raw packet with `log_raw_frames`    |
 | VERBOSE | Raw bytes of each event, radio repeats, ignored non-sensor X3D traffic |
 
 ## Hub options
 
 ```yaml
 x3d_rfm69:
-  id: x3d_radio            # needed only with several radios (x3d_rfm69_id on platforms)
+  id: x3d_radio            # optional
   cs_pin: GPIO5            # required, SPI chip select (NSS)
   dio0_pin: GPIO4          # optional, PayloadReady interrupt
   frequency: 868.95MHz     # default
-  log_unknown_devices: true
+  log_unclaimed_devices: true
   log_raw_frames: false    # log every packet received, including other X3D traffic
+  last_frame: ...          # optional text sensor, last event of any device
+  windows: ...             # claimed devices and their entities
   on_window_event: ...     # variables: device_id, state, kind, rssi, raw
 ```
 
