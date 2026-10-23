@@ -117,13 +117,14 @@ sensor:
 ## Finding device IDs
 
 Flash with `log_unknown_devices: true` (the default), then turn each handle
-one window at a time:
+one window at a time. Devices not claimed by a `device_id` in your YAML are
+logged at INFO, so they stand out:
 
 ```
-[I][x3d_rfm69]: Unconfigured device 0xEFCC85: unlocked (window, msg 0x55, bytes 8-9: 08 41, -67.5 dBm) raw: 13 ff 55 00 2d 85 cc ef 08 41 82 00 20 00 00 fc d5 75 49
+[I][x3d_rfm69]: Unclaimed device 0xEFCC85 (window): unlocked, -67.5 dBm -> add 'device_id: 0xEFCC85' to claim it
 ```
 
-The hub-wide `last_frame` text sensor shows the same thing in Home Assistant
+The hub-wide `last_frame` text sensor shows every device in Home Assistant
 (`EFCC85 unlocked (window, msg 0x55, -67.5 dBm)`):
 
 ```yaml
@@ -133,7 +134,14 @@ text_sensor:
       name: "Last X3D frame"
 ```
 
-Once a window is declared (option B) its log line reads `Window 0xEFCC85: ...`.
+Log levels:
+
+| Level   | What                                                                 |
+|---------|----------------------------------------------------------------------|
+| INFO    | Events of unclaimed devices (with `log_unknown_devices: true`)       |
+| WARN    | Unexpected values in bytes 8-14, with the raw frame                  |
+| DEBUG   | Events of claimed devices, every raw packet with `log_raw_frames`     |
+| VERBOSE | Raw bytes of each event, radio repeats, ignored non-sensor X3D traffic |
 
 ## Hub options
 

@@ -229,8 +229,9 @@ void X3DRFM69::read_and_handle_packet_() {
 }
 
 void X3DRFM69::handle_frame_(const uint8_t *buf, size_t len, float rssi) {
-  if (this->log_raw_frames_)
+  if (this->log_raw_frames_) {
     ESP_LOGD(TAG, "RX %.1f dBm: %s", rssi, to_hex(buf, len).c_str());
+  }
 
   SensorFrame frame{};
   ParseResult res = parse_sensor_frame(buf, len, &frame);
@@ -259,17 +260,20 @@ void X3DRFM69::handle_frame_(const uint8_t *buf, size_t len, float rssi) {
     }
   }
 
-  if (known) {
-    ESP_LOGI(TAG, "Window 0x%s: %s (%s, msg 0x%02X, bytes 8-9: %02X %02X, %.1f dBm)", id_str, state_str, kind_str,
-             frame.msg_no, frame.flags, frame.state_byte, rssi);
-  } else if (this->log_unknown_devices_) {
-    ESP_LOGI(TAG, "Unconfigured device 0x%s: %s (%s, msg 0x%02X, bytes 8-9: %02X %02X, %.1f dBm) raw: %s", id_str,
-             state_str, kind_str, frame.msg_no, frame.flags, frame.state_byte, rssi, raw.c_str());
+  // INFO only for devices not claimed in the YAML, so they stand out while discovering.
+  if (!known && this->log_unknown_devices_) {
+    ESP_LOGI(TAG, "Unclaimed device 0x%s (%s): %s, %.1f dBm -> add 'device_id: 0x%s' to claim it", id_str, kind_str,
+             state_str, rssi, id_str);
+  } else {
+    ESP_LOGD(TAG, "Device 0x%s (%s): %s, %.1f dBm", id_str, kind_str, state_str, rssi);
   }
+  ESP_LOGV(TAG, "Device 0x%s msg 0x%02X, bytes 8-9: %02X %02X, raw: %s", id_str, frame.msg_no, frame.flags,
+           frame.state_byte, raw.c_str());
 
-  if (frame.state == WindowState::UNKNOWN)
-    ESP_LOGD(TAG, "Device 0x%s: state byte 0x%02X means \"not changed\", entities keep their value", id_str,
+  if (frame.state == WindowState::UNKNOWN) {
+    ESP_LOGV(TAG, "Device 0x%s: state byte 0x%02X means \"not changed\", entities keep their value", id_str,
              frame.state_byte);
+  }
   if (has_unexpected_bits(frame))
     ESP_LOGW(TAG, "Device 0x%s: unexpected bits in bytes 8-14, please report. raw: %s", id_str, raw.c_str());
 

@@ -49,7 +49,8 @@ x3d_rfm69:
   cs_pin: GPIO5
   dio0_pin: GPIO4
   frequency: 868.95MHz
-  # Discovery: log every new event of devices not declared below, with their ID.
+  # Discovery: log events of devices not claimed below at INFO, with their ID.
+  # Claimed devices log at DEBUG.
   log_unknown_devices: true
   # Log every raw packet received (noisy, for debugging only).
   log_raw_frames: false
