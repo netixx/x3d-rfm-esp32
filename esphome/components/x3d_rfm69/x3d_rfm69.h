@@ -47,8 +47,10 @@ class X3DRFM69 : public Component,
   void set_log_raw_frames(bool log) { this->log_raw_frames_ = log; }
 
   void register_listener(X3DListener *listener);
-  /// (device_id hex string, state, rssi, raw frame hex), once per new event of any device.
-  Trigger<std::string, std::string, float, std::string> *get_window_event_trigger() { return &this->event_trigger_; }
+  /// (device_id hex string, state, kind, rssi, raw frame hex), once per new event of any device.
+  Trigger<std::string, std::string, std::string, float, std::string> *get_window_event_trigger() {
+    return &this->event_trigger_;
+  }
 
  protected:
   uint8_t read_register_(uint8_t reg);
@@ -70,7 +72,7 @@ class X3DRFM69 : public Component,
 
   Deduplicator dedup_;
   std::vector<X3DListener *> listeners_;
-  Trigger<std::string, std::string, float, std::string> event_trigger_;
+  Trigger<std::string, std::string, std::string, float, std::string> event_trigger_;
 };
 
 }  // namespace esphome::x3d_rfm69

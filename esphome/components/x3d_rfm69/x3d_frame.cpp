@@ -1,23 +1,29 @@
 #include "x3d_frame.h"
 
+#include <cstring>
+
 namespace esphome::x3d_rfm69 {
 
 // Frame layout (idx 0 = length byte), verified on K-LINE DVI captures:
 //   0 len | 1 0xff | 2 msg# | 3 type | 4 flags|hdr_len | 5..7 device id (LE)
-//   8 lock | 9 sash | 10.. extra | header checksum (BE) | CRC16 (BE)
+//   8 flags | 9 state | 10.. extra | header checksum (BE) | CRC16 (BE)
 static constexpr size_t IDX_LEN = 0;
 static constexpr size_t IDX_MSG_NO = 2;
 static constexpr size_t IDX_TYPE = 3;
 static constexpr size_t IDX_HEADER = 4;
 static constexpr size_t IDX_DEVICE_ID = 5;
-static constexpr size_t IDX_LOCK = 8;
-static constexpr size_t IDX_SASH = 9;
+static constexpr size_t IDX_FLAGS = 8;
+static constexpr size_t IDX_STATE = 9;
 static constexpr size_t IDX_EXTRA = 10;
 static constexpr uint8_t HEADER_LEN_MASK = 0x1f;
-// device id (3) + lock + sash + checksum (2)
+// device id (3) + flags + state + checksum (2)
 static constexpr uint8_t MIN_HEADER_LEN = 1 + 3 + 1 + 1 + 2;
 
-static const uint8_t KNOWN_EXTRA[] = {0x82, 0x00, 0x20, 0x00, 0x00};
+// Bytes 10-14 seen so far, byte 12 is the sensor kind (0x20 window / 0x40 sliding).
+static const uint8_t KNOWN_EXTRA[][5] = {
+    {0x82, 0x00, 0x20, 0x00, 0x00},
+    {0x82, 0x00, 0x40, 0x00, 0x00},
+};
 
 uint16_t crc16_xmodem(const uint8_t *data, size_t len) {
   uint16_t crc = 0x0000;
@@ -65,36 +71,42 @@ ParseResult parse_sensor_frame(const uint8_t *buf, size_t buf_len, SensorFrame *
   out->msg_no = buf[IDX_MSG_NO];
   out->device_id = static_cast<uint32_t>(buf[IDX_DEVICE_ID]) | static_cast<uint32_t>(buf[IDX_DEVICE_ID + 1]) << 8 |
                    static_cast<uint32_t>(buf[IDX_DEVICE_ID + 2]) << 16;
-  out->lock = buf[IDX_LOCK];
-  out->sash = buf[IDX_SASH];
+  out->flags = buf[IDX_FLAGS];
+  out->state_byte = buf[IDX_STATE];
   out->extra_len = 0;
   for (size_t i = IDX_EXTRA; i < chk_idx && out->extra_len < sizeof(out->extra); i++)
     out->extra[out->extra_len++] = buf[i];
-  out->state = decode_window_state(out->lock, out->sash);
+  out->state = decode_window_state(out->state_byte);
   return ParseResult::OK;
 }
 
-WindowState decode_window_state(uint8_t lock, uint8_t sash) {
-  if (sash & DVI_SASH_OPEN_BIT)
-    return WindowState::OPEN;
-  if (!(sash & DVI_SASH_VALID_BIT))
-    return WindowState::UNKNOWN;  // e.g. "no change" message of plain detectors
-  if (lock & DVI_LOCK_UNLOCKED_BIT)
-    return WindowState::CLOSED_UNLOCKED;
-  return WindowState::CLOSED_LOCKED;
+WindowState decode_window_state(uint8_t state_byte) {
+  if (state_byte & DVI_STATE_UNLOCKED_BIT)
+    return WindowState::UNLOCKED;
+  if (state_byte & DVI_STATE_VALID_BIT)
+    return WindowState::LOCKED;
+  return WindowState::UNKNOWN;
 }
 
 const char *window_state_to_string(WindowState state) {
   switch (state) {
-    case WindowState::OPEN:
-      return "open";
-    case WindowState::CLOSED_UNLOCKED:
-      return "closed_unlocked";
-    case WindowState::CLOSED_LOCKED:
-      return "closed_locked";
+    case WindowState::LOCKED:
+      return "locked";
+    case WindowState::UNLOCKED:
+      return "unlocked";
     default:
       return "unknown";
   }
+}
+
+const char *sensor_kind_to_string(const SensorFrame &frame) {
+  if (frame.extra_len >= 3) {
+    if (frame.extra[2] == 0x20)
+      return "window";
+    if (frame.extra[2] == 0x40)
+      return "sliding";
+  }
+  return "unknown";
 }
 
 const char *parse_result_to_string(ParseResult result) {
@@ -119,17 +131,18 @@ const char *parse_result_to_string(ParseResult result) {
 }
 
 bool has_unexpected_bits(const SensorFrame &frame) {
-  if (frame.lock != 0x00 && frame.lock != DVI_LOCK_UNLOCKED_BIT)
+  if (frame.flags != 0x00 && frame.flags != 0x04 && frame.flags != 0x08)
     return true;
-  if (frame.sash != DVI_SASH_VALID_BIT && frame.sash != (DVI_SASH_VALID_BIT | DVI_SASH_OPEN_BIT))
+  if (frame.state_byte != 0x00 && frame.state_byte != DVI_STATE_VALID_BIT &&
+      frame.state_byte != (DVI_STATE_VALID_BIT | DVI_STATE_UNLOCKED_BIT))
     return true;
-  if (frame.extra_len != sizeof(KNOWN_EXTRA))
+  if (frame.extra_len != sizeof(KNOWN_EXTRA[0]))
     return true;
-  for (size_t i = 0; i < sizeof(KNOWN_EXTRA); i++) {
-    if (frame.extra[i] != KNOWN_EXTRA[i])
-      return true;
+  for (const auto &known : KNOWN_EXTRA) {
+    if (memcmp(frame.extra, known, sizeof(known)) == 0)
+      return false;
   }
-  return false;
+  return true;
 }
 
 bool Deduplicator::is_new(uint32_t device_id, uint8_t msg_no, uint32_t now_ms) {

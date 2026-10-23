@@ -34,11 +34,11 @@ CONFIG_SCHEMA = cv.All(
             cv.GenerateID(): cv.declare_id(X3DWindowTextSensor),
             cv.GenerateID(CONF_X3D_RFM69_ID): cv.use_id(X3DRFM69),
             cv.Optional(CONF_DEVICE_ID): x3d_device_id,
-            # open / closed_unlocked / closed_locked
+            # locked / unlocked
             cv.Optional(CONF_STATE): text_sensor.text_sensor_schema(
                 icon="mdi:window-closed-variant",
             ),
-            # "EFCC85 open (msg 0x42, -71.5 dBm)" for any device: discovery from HA
+            # "EFCC85 unlocked (window, msg 0x55, -71.5 dBm)" for any device: discovery from HA
             cv.Optional(CONF_LAST_FRAME): text_sensor.text_sensor_schema(
                 icon="mdi:radio-tower",
                 entity_category=ENTITY_CATEGORY_DIAGNOSTIC,

@@ -2,8 +2,9 @@
 
 `x3d_rfm69` is an ESPHome external component that listens to Delta Dore **X3D**
 868 MHz radio traffic with an **RFM69HW (SX1231)** on an **ESP32**, and decodes
-the window sensor messages of K•LINE DVI window sensors: open, closed and
-unlocked, closed and locked.
+the messages of K•LINE DVI sensors (Détecteur de Verrouillage Intégré). The DVI
+reads the window or door handle and reports **locked** or **unlocked**. Opening
+the sash doesn't send anything.
 
 It only receives. It doesn't pair or transmit, so it doesn't interfere with an
 existing Delta Dore / Tydom installation.
@@ -64,17 +65,21 @@ x3d_rfm69:
         data:
           device_id: !lambda "return device_id;"
           state: !lambda "return state;"
+          kind: !lambda "return kind;"
           rssi: !lambda 'return str_sprintf("%.1f", rssi);'
 ```
 
-Event data: `device_id` (for example `EFCC85`), `state` (`open`,
-`closed_unlocked`, `closed_locked`, or `unknown`), and `rssi`. Watch them live
+Event data: `device_id` (for example `EFCC85`), `state` (`locked`,
+`unlocked`, or `unknown`), `kind` (`window`, `sliding`, or `unknown`), and
+`rssi`. Watch them live
 in Home Assistant under *Developer tools → Events → Listen to
 `esphome.x3d_window`*.
 
-[`homeassistant/x3d_windows.yaml`](homeassistant/x3d_windows.yaml) is a Home
-Assistant package that turns these events into trigger-based template entities:
-one block per window, with the ID and names set in Home Assistant. Those
+[`homeassistant/x3d_windows.yaml`](homeassistant/x3d_windows.yaml) turns these
+events into trigger-based template entities: one block per window, with the ID
+and names set in Home Assistant. Paste its `template:` block into
+`configuration.yaml`, or drop the file in `<config>/packages/` if you use
+[packages](https://www.home-assistant.io/docs/configuration/packages/). Those
 entities keep their state across Home Assistant restarts. While Home Assistant
 is disconnected from the ESP, events are lost; the window catches up on its
 next change.
@@ -91,37 +96,35 @@ Declare each window with its ID:
 binary_sensor:
   - platform: x3d_rfm69
     device_id: 0xEFCC85
-    opening:
-      name: "Living room window"       # ON = open (device_class window)
     lock:
-      name: "Living room window lock"  # ON = unlocked (device_class lock)
+      name: "Tilt window lock"         # ON = unlocked (device_class lock)
 
 text_sensor:
   - platform: x3d_rfm69
     device_id: 0xEFCC85
     state:
-      name: "Living room window state" # open / closed_unlocked / closed_locked
+      name: "Tilt window state"        # locked / unlocked
 
 sensor:
   - platform: x3d_rfm69
     device_id: 0xEFCC85
     rssi:
-      name: "Living room window RSSI"  # updated on each event: acts as "last seen"
+      name: "Tilt window RSSI"         # updated on each event: acts as "last seen"
 ```
 
 `device_id` accepts `0xEFCC85` or `"EFCC85"` (as printed in the logs).
 
 ## Finding device IDs
 
-Flash with `log_unknown_devices: true` (the default), then open and close each
-window one at a time:
+Flash with `log_unknown_devices: true` (the default), then turn each handle
+one window at a time:
 
 ```
-[I][x3d_rfm69]: Unconfigured device 0xEFCC85: open (msg 0x42, lock 0x08, sash 0x41, -67.5 dBm) raw: 13 ff 42 00 2d 85 cc ef 08 41 82 00 20 00 00 fc d5 43 54
+[I][x3d_rfm69]: Unconfigured device 0xEFCC85: unlocked (window, msg 0x55, bytes 8-9: 08 41, -67.5 dBm) raw: 13 ff 55 00 2d 85 cc ef 08 41 82 00 20 00 00 fc d5 75 49
 ```
 
 The hub-wide `last_frame` text sensor shows the same thing in Home Assistant
-(`EFCC85 open (msg 0x42, -67.5 dBm)`):
+(`EFCC85 unlocked (window, msg 0x55, -67.5 dBm)`):
 
 ```yaml
 text_sensor:
@@ -142,7 +145,7 @@ x3d_rfm69:
   frequency: 868.95MHz     # default
   log_unknown_devices: true
   log_raw_frames: false    # log every packet received, including other X3D traffic
-  on_window_event: ...     # variables: device_id, state, rssi, raw
+  on_window_event: ...     # variables: device_id, state, kind, rssi, raw
 ```
 
 ## Decoding notes
@@ -153,14 +156,24 @@ x3d_rfm69:
   payload, stored big endian. It matches both reference captures.
 - Header checksum: `0x10000 - sum(device id .. byte before checksum)`, big
   endian, checked as well.
-- State: sash byte bit `0x40` = open. Otherwise lock byte bit `0x08` = unlocked,
-  else locked. If the sash byte has neither `0x40` nor `0x01` set, the state is
-  `unknown` and entities keep their value.
-- Unexpected values in bytes 8-14 (possibly battery low or tamper) are logged
-  at WARN level with the raw frame. Please report them.
-- The `closed_unlocked` state (`08 01`) is inferred and hasn't been captured
-  yet. Check the logs the first time you close a window without turning the
-  handle.
+- Frame bytes 8-14, from captures of a tilt (soufflet) window and a sliding
+  door:
+
+  | Device            | Locked                 | Unlocked               |
+  |-------------------|------------------------|------------------------|
+  | Tilt window       | `00 01 82 00 20 00 00` | `08 41 82 00 20 00 00` |
+  | Sliding door      | `00 01 82 00 40 00 00` | `04 41 82 00 40 00 00` |
+
+  State comes from byte 9: bit `0x40` = unlocked, `0x01` = locked, `0x00` =
+  "not changed" (entities keep their value). Byte 12 gives the `kind`:
+  `0x20` window, `0x40` sliding. That matches Tydom's `windowFrench` /
+  `windowSliding` device types. Tydom reports `LOCKED` / `OPEN_FRENCH` /
+  `OPEN_HOPPER` for French windows, so a tilt-and-turn window may use another
+  byte 8 value in the tilt position. Captures welcome.
+- Each event is sent 3 times ~20 ms apart, then the same burst again
+  ~3.5-5.3 s later. Both are dropped by message number for 30 s.
+- Values in bytes 8-14 that don't match the table (possibly battery low or
+  tamper) are logged at WARN level with the raw frame. Please report them.
 
 ## Tests
 

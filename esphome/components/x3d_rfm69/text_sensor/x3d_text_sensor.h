@@ -20,9 +20,9 @@ class X3DWindowTextSensor : public X3DListener {
     if (this->state_ != nullptr && frame.state != WindowState::UNKNOWN)
       this->state_->publish_state(window_state_to_string(frame.state));
     if (this->last_frame_ != nullptr) {
-      char buf[64];
-      snprintf(buf, sizeof(buf), "%06" PRIX32 " %s (msg 0x%02X, %.1f dBm)", frame.device_id,
-               window_state_to_string(frame.state), frame.msg_no, event.rssi);
+      char buf[80];
+      snprintf(buf, sizeof(buf), "%06" PRIX32 " %s (%s, msg 0x%02X, %.1f dBm)", frame.device_id,
+               window_state_to_string(frame.state), sensor_kind_to_string(frame), frame.msg_no, event.rssi);
       this->last_frame_->publish_state(buf);
     }
   }

@@ -1,6 +1,7 @@
-# Home Assistant package: map X3D device IDs to window entities (option A).
+# Home Assistant config: map X3D device IDs to entities (option A).
 #
-# Put this file in <config>/packages/ and enable packages in configuration.yaml:
+# Either paste the "template:" block below into configuration.yaml, or use it as
+# a package: put this file in <config>/packages/ and add to configuration.yaml
 #   homeassistant:
 #     packages: !include_dir_named packages
 #
@@ -8,6 +9,7 @@
 # Developer tools > Events > listen to "esphome.x3d_window", then copy one
 # block per window and change the ID / names. Restart or reload template entities.
 #
+# The DVI reads the handle: states are "locked" / "unlocked".
 # Trigger-based template entities keep their last state across HA restarts.
 
 template:
@@ -20,25 +22,25 @@ template:
       - condition: template
         value_template: "{{ trigger.event.data.state != 'unknown' }}"
     binary_sensor:
-      - name: "Living room window"
-        unique_id: x3d_efcc85_opening
-        device_class: window
-        state: "{{ trigger.event.data.state == 'open' }}"
-      - name: "Living room window lock"
+      - name: "Tilt window lock"
         unique_id: x3d_efcc85_lock
         device_class: lock # on = unlocked
-        state: "{{ trigger.event.data.state != 'closed_locked' }}"
-    sensor:
-      - name: "Living room window state"
-        unique_id: x3d_efcc85_state
-        state: "{{ trigger.event.data.state }}" # open / closed_unlocked / closed_locked
+        state: "{{ trigger.event.data.state == 'unlocked' }}"
         attributes:
           rssi: "{{ trigger.event.data.rssi }}"
 
-  # Second window: copy the block above.
-  # - triggers:
-  #     - trigger: event
-  #       event_type: esphome.x3d_window
-  #       event_data:
-  #         device_id: "123456"
-  #   ...
+  - triggers:
+      - trigger: event
+        event_type: esphome.x3d_window
+        event_data:
+          device_id: "EFA00B"
+    conditions:
+      - condition: template
+        value_template: "{{ trigger.event.data.state != 'unknown' }}"
+    binary_sensor:
+      - name: "Sliding door lock"
+        unique_id: x3d_efa00b_lock
+        device_class: lock
+        state: "{{ trigger.event.data.state == 'unlocked' }}"
+        attributes:
+          rssi: "{{ trigger.event.data.rssi }}"

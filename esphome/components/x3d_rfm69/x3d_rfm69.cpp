@@ -249,6 +249,7 @@ void X3DRFM69::handle_frame_(const uint8_t *buf, size_t len, float rssi) {
   char id_str[7];
   snprintf(id_str, sizeof(id_str), "%06" PRIX32, frame.device_id);
   const char *state_str = window_state_to_string(frame.state);
+  const char *kind_str = sensor_kind_to_string(frame);
 
   bool known = false;
   for (auto *listener : this->listeners_) {
@@ -259,16 +260,16 @@ void X3DRFM69::handle_frame_(const uint8_t *buf, size_t len, float rssi) {
   }
 
   if (known) {
-    ESP_LOGI(TAG, "Window 0x%s: %s (msg 0x%02X, lock 0x%02X, sash 0x%02X, %.1f dBm)", id_str, state_str, frame.msg_no,
-             frame.lock, frame.sash, rssi);
+    ESP_LOGI(TAG, "Window 0x%s: %s (%s, msg 0x%02X, bytes 8-9: %02X %02X, %.1f dBm)", id_str, state_str, kind_str,
+             frame.msg_no, frame.flags, frame.state_byte, rssi);
   } else if (this->log_unknown_devices_) {
-    ESP_LOGI(TAG, "Unconfigured device 0x%s: %s (msg 0x%02X, lock 0x%02X, sash 0x%02X, %.1f dBm) raw: %s", id_str,
-             state_str, frame.msg_no, frame.lock, frame.sash, rssi, raw.c_str());
+    ESP_LOGI(TAG, "Unconfigured device 0x%s: %s (%s, msg 0x%02X, bytes 8-9: %02X %02X, %.1f dBm) raw: %s", id_str,
+             state_str, kind_str, frame.msg_no, frame.flags, frame.state_byte, rssi, raw.c_str());
   }
 
   if (frame.state == WindowState::UNKNOWN)
-    ESP_LOGW(TAG, "Device 0x%s: sash byte 0x%02X has neither open nor closed bit, state unchanged. raw: %s", id_str,
-             frame.sash, raw.c_str());
+    ESP_LOGD(TAG, "Device 0x%s: state byte 0x%02X means \"not changed\", entities keep their value", id_str,
+             frame.state_byte);
   if (has_unexpected_bits(frame))
     ESP_LOGW(TAG, "Device 0x%s: unexpected bits in bytes 8-14, please report. raw: %s", id_str, raw.c_str());
 
@@ -278,7 +279,7 @@ void X3DRFM69::handle_frame_(const uint8_t *buf, size_t len, float rssi) {
       listener->on_window_event(event);
   }
 
-  this->event_trigger_.trigger(std::string(id_str), std::string(state_str), rssi, raw);
+  this->event_trigger_.trigger(std::string(id_str), std::string(state_str), std::string(kind_str), rssi, raw);
 }
 
 void X3DRFM69::register_listener(X3DListener *listener) { this->listeners_.push_back(listener); }

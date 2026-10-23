@@ -6,7 +6,10 @@
 #     "esphome.x3d_window" HA event. See homeassistant/x3d_windows.yaml.
 #     Adding a window needs no reflash.
 #  B. Map IDs here: declare each window with its device_id, ESPHome creates
-#     native entities (open/closed, lock, state, RSSI).
+#     native entities (lock, state, RSSI).
+#
+# The DVI reads the window handle: it reports locked / unlocked only.
+# Opening the sash doesn't send anything.
 
 esphome:
   name: x3d-dvi
@@ -52,17 +55,19 @@ x3d_rfm69:
   log_raw_frames: false
   # Option A: forward every event to Home Assistant, once per real event
   # (radio repeats are dropped). Variables: device_id ("EFCC85"),
-  # state (open / closed_unlocked / closed_locked / unknown), rssi (dBm), raw (hex).
+  # state (locked / unlocked / unknown), kind (window / sliding / unknown),
+  # rssi (dBm), raw (hex).
   on_window_event:
     - homeassistant.event:
         event: esphome.x3d_window
         data:
           device_id: !lambda "return device_id;"
           state: !lambda "return state;"
+          kind: !lambda "return kind;"
           rssi: !lambda "return str_sprintf(\"%.1f\", rssi);"
 
 text_sensor:
-  # Last event of any device: open/close each window and read its ID here or in the logs.
+  # Last event of any device: lock/unlock each handle and read its ID here or in the logs.
   - platform: x3d_rfm69
     last_frame:
       name: "Last X3D frame"
@@ -71,18 +76,31 @@ text_sensor:
   - platform: x3d_rfm69
     device_id: 0xEFCC85
     state:
-      name: "Living room window state" # open / closed_unlocked / closed_locked
+      name: "Tilt window state" # locked / unlocked
+
+  - platform: x3d_rfm69
+    device_id: 0xEFA00B
+    state:
+      name: "Sliding door state"
 
 binary_sensor:
   - platform: x3d_rfm69
     device_id: 0xEFCC85
-    opening:
-      name: "Living room window" # ON = open
     lock:
-      name: "Living room window lock" # ON = unlocked
+      name: "Tilt window lock" # ON = unlocked
+
+  - platform: x3d_rfm69
+    device_id: 0xEFA00B
+    lock:
+      name: "Sliding door lock"
 
 sensor:
   - platform: x3d_rfm69
     device_id: 0xEFCC85
     rssi:
-      name: "Living room window RSSI"
+      name: "Tilt window RSSI"
+
+  - platform: x3d_rfm69
+    device_id: 0xEFA00B
+    rssi:
+      name: "Sliding door RSSI"

@@ -82,6 +82,7 @@ async def to_code(config):
             [
                 (cg.std_string, "device_id"),
                 (cg.std_string, "state"),
+                (cg.std_string, "kind"),
                 (cg.float_, "rssi"),
                 (cg.std_string, "raw"),
             ],

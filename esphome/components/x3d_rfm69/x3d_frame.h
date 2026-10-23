@@ -11,16 +11,15 @@ namespace esphome::x3d_rfm69 {
 static constexpr uint8_t X3D_MSG_TYPE_SENSOR = 0x00;
 static constexpr size_t X3D_MAX_FRAME_LEN = 65;  // length byte + 64 byte payload
 
-// Lock byte (idx 8) and sash byte (idx 9) bits seen on K-LINE DVI captures.
-static constexpr uint8_t DVI_LOCK_UNLOCKED_BIT = 0x08;
-static constexpr uint8_t DVI_SASH_OPEN_BIT = 0x40;
-static constexpr uint8_t DVI_SASH_VALID_BIT = 0x01;
+// State byte (idx 9) bits seen on K-LINE DVI captures. The DVI reads the
+// handle: it reports locked / unlocked, not open / closed.
+static constexpr uint8_t DVI_STATE_UNLOCKED_BIT = 0x40;
+static constexpr uint8_t DVI_STATE_VALID_BIT = 0x01;
 
 enum class WindowState : uint8_t {
-  UNKNOWN = 0,
-  OPEN,
-  CLOSED_UNLOCKED,
-  CLOSED_LOCKED,
+  UNKNOWN = 0,  // "state not changed" message (state byte 0x00)
+  LOCKED,
+  UNLOCKED,
 };
 
 enum class ParseResult : uint8_t {
@@ -37,9 +36,9 @@ struct SensorFrame {
   uint8_t length;      // idx 0, total frame length including length byte and CRC
   uint8_t msg_no;      // idx 2, rolling message number
   uint32_t device_id;  // idx 5..7, little endian
-  uint8_t lock;        // idx 8
-  uint8_t sash;        // idx 9
-  uint8_t extra[8];    // idx 10 up to header checksum (usually 82 00 20 00 00)
+  uint8_t flags;       // idx 8, 0x00 locked, 0x08 (window) / 0x04 (sliding) unlocked
+  uint8_t state_byte;  // idx 9, 0x41 unlocked / 0x01 locked / 0x00 not changed
+  uint8_t extra[8];    // idx 10 up to header checksum (82 00 20 00 00 or 82 00 40 00 00)
   uint8_t extra_len;
   WindowState state;
 };
@@ -52,23 +51,28 @@ uint16_t crc16_xmodem(const uint8_t *data, size_t len);
 /// buf_len is the number of bytes available in buf; trailing garbage is ignored.
 ParseResult parse_sensor_frame(const uint8_t *buf, size_t buf_len, SensorFrame *out);
 
-WindowState decode_window_state(uint8_t lock, uint8_t sash);
+WindowState decode_window_state(uint8_t state_byte);
 
 const char *window_state_to_string(WindowState state);
+
+/// Sensor kind from byte 12: 0x20 on a tilt (soufflet) window, 0x40 on a
+/// sliding door. Same split as Tydom's windowFrench / windowSliding.
+const char *sensor_kind_to_string(const SensorFrame &frame);
 const char *parse_result_to_string(ParseResult result);
 
-/// True when lock/sash/extra bytes differ from every value captured so far
+/// True when bytes 8-14 differ from every value captured so far
 /// (candidate for battery low, tamper, ...).
 bool has_unexpected_bits(const SensorFrame &frame);
 
-/// Drops the X3D repeats (each event is sent 3 times ~20 ms apart with the same
-/// message number). A (device, msg#) pair is a duplicate only if seen within
-/// `window_ms`, so rolling / reset counters don't swallow real events.
+/// Drops the X3D repeats: each event is sent 3 times ~20 ms apart, and the burst
+/// is usually sent again ~3.5-4 s later, all with the same message number.
+/// A (device, msg#) pair is a duplicate only if seen within `window_ms`, so
+/// rolling / reset counters don't swallow real events.
 class Deduplicator {
  public:
   static constexpr size_t MAX_DEVICES = 32;
 
-  explicit Deduplicator(uint32_t window_ms = 5000) : window_ms_(window_ms) {}
+  explicit Deduplicator(uint32_t window_ms = 30000) : window_ms_(window_ms) {}
 
   /// Returns true if this frame is a new event and records it.
   bool is_new(uint32_t device_id, uint8_t msg_no, uint32_t now_ms);
