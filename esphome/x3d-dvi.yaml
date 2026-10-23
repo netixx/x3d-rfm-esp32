@@ -1,0 +1,88 @@
+# Demo: Delta Dore X3D window sensors (K-LINE DVI) -> Home Assistant
+# ESP32 DevKit V1 + RFM69HW 868 MHz, wiring in esphome/README.md.
+#
+# Two ways to get windows into Home Assistant, both enabled below:
+#  A. Map IDs in Home Assistant: every event of every device is sent as an
+#     "esphome.x3d_window" HA event. See homeassistant/x3d_windows.yaml.
+#     Adding a window needs no reflash.
+#  B. Map IDs here: declare each window with its device_id, ESPHome creates
+#     native entities (open/closed, lock, state, RSSI).
+
+esphome:
+  name: x3d-dvi
+  friendly_name: X3D windows
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://netixx/x3d-rfm-esp32@esphome-x3d-dvi
+    components: [x3d_rfm69]
+
+logger:
+  level: DEBUG
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+    encryption: {} # reuses the api encryption key
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+spi:
+  clk_pin: GPIO18
+  miso_pin: GPIO19
+  mosi_pin: GPIO23
+
+x3d_rfm69:
+  id: x3d_radio
+  cs_pin: GPIO5
+  dio0_pin: GPIO4
+  frequency: 868.95MHz
+  # Discovery: log every new event of devices not declared below, with their ID.
+  log_unknown_devices: true
+  # Log every raw packet received (noisy, for debugging only).
+  log_raw_frames: false
+  # Option A: forward every event to Home Assistant, once per real event
+  # (radio repeats are dropped). Variables: device_id ("EFCC85"),
+  # state (open / closed_unlocked / closed_locked / unknown), rssi (dBm), raw (hex).
+  on_window_event:
+    - homeassistant.event:
+        event: esphome.x3d_window
+        data:
+          device_id: !lambda "return device_id;"
+          state: !lambda "return state;"
+          rssi: !lambda "return str_sprintf(\"%.1f\", rssi);"
+
+text_sensor:
+  # Last event of any device: open/close each window and read its ID here or in the logs.
+  - platform: x3d_rfm69
+    last_frame:
+      name: "Last X3D frame"
+
+  # Option B: one block per window, device_id taken from the logs / "Last X3D frame".
+  - platform: x3d_rfm69
+    device_id: 0xEFCC85
+    state:
+      name: "Living room window state" # open / closed_unlocked / closed_locked
+
+binary_sensor:
+  - platform: x3d_rfm69
+    device_id: 0xEFCC85
+    opening:
+      name: "Living room window" # ON = open
+    lock:
+      name: "Living room window lock" # ON = unlocked
+
+sensor:
+  - platform: x3d_rfm69
+    device_id: 0xEFCC85
+    rssi:
+      name: "Living room window RSSI"

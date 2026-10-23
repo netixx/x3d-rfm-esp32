@@ -1,0 +1,44 @@
+# Home Assistant package: map X3D device IDs to window entities (option A).
+#
+# Put this file in <config>/packages/ and enable packages in configuration.yaml:
+#   homeassistant:
+#     packages: !include_dir_named packages
+#
+# Find IDs with the "Last X3D frame" entity, the ESPHome logs, or
+# Developer tools > Events > listen to "esphome.x3d_window", then copy one
+# block per window and change the ID / names. Restart or reload template entities.
+#
+# Trigger-based template entities keep their last state across HA restarts.
+
+template:
+  - triggers:
+      - trigger: event
+        event_type: esphome.x3d_window
+        event_data:
+          device_id: "EFCC85"
+    conditions:
+      - condition: template
+        value_template: "{{ trigger.event.data.state != 'unknown' }}"
+    binary_sensor:
+      - name: "Living room window"
+        unique_id: x3d_efcc85_opening
+        device_class: window
+        state: "{{ trigger.event.data.state == 'open' }}"
+      - name: "Living room window lock"
+        unique_id: x3d_efcc85_lock
+        device_class: lock # on = unlocked
+        state: "{{ trigger.event.data.state != 'closed_locked' }}"
+    sensor:
+      - name: "Living room window state"
+        unique_id: x3d_efcc85_state
+        state: "{{ trigger.event.data.state }}" # open / closed_unlocked / closed_locked
+        attributes:
+          rssi: "{{ trigger.event.data.rssi }}"
+
+  # Second window: copy the block above.
+  # - triggers:
+  #     - trigger: event
+  #       event_type: esphome.x3d_window
+  #       event_data:
+  #         device_id: "123456"
+  #   ...

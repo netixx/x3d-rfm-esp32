@@ -1,0 +1,87 @@
+#pragma once
+
+// Pure X3D frame parsing helpers (no ESPHome / hardware dependency) so they can
+// be unit tested on the host, see esphome/tests/test_x3d_frame.cpp.
+
+#include <cstddef>
+#include <cstdint>
+
+namespace esphome::x3d_rfm69 {
+
+static constexpr uint8_t X3D_MSG_TYPE_SENSOR = 0x00;
+static constexpr size_t X3D_MAX_FRAME_LEN = 65;  // length byte + 64 byte payload
+
+// Lock byte (idx 8) and sash byte (idx 9) bits seen on K-LINE DVI captures.
+static constexpr uint8_t DVI_LOCK_UNLOCKED_BIT = 0x08;
+static constexpr uint8_t DVI_SASH_OPEN_BIT = 0x40;
+static constexpr uint8_t DVI_SASH_VALID_BIT = 0x01;
+
+enum class WindowState : uint8_t {
+  UNKNOWN = 0,
+  OPEN,
+  CLOSED_UNLOCKED,
+  CLOSED_LOCKED,
+};
+
+enum class ParseResult : uint8_t {
+  OK = 0,
+  TOO_SHORT,
+  BAD_LENGTH,
+  BAD_CRC,
+  NOT_SENSOR,
+  BAD_HEADER,
+  BAD_HEADER_CHECKSUM,
+};
+
+struct SensorFrame {
+  uint8_t length;      // idx 0, total frame length including length byte and CRC
+  uint8_t msg_no;      // idx 2, rolling message number
+  uint32_t device_id;  // idx 5..7, little endian
+  uint8_t lock;        // idx 8
+  uint8_t sash;        // idx 9
+  uint8_t extra[8];    // idx 10 up to header checksum (usually 82 00 20 00 00)
+  uint8_t extra_len;
+  WindowState state;
+};
+
+/// CRC-16/XMODEM: poly 0x1021, init 0x0000, not reflected, no final xor.
+/// Verified against the DVI captures (over length byte + payload, stored big endian).
+uint16_t crc16_xmodem(const uint8_t *data, size_t len);
+
+/// Parse a de-whitened frame as read from the SX1231 FIFO (buf[0] = length byte).
+/// buf_len is the number of bytes available in buf; trailing garbage is ignored.
+ParseResult parse_sensor_frame(const uint8_t *buf, size_t buf_len, SensorFrame *out);
+
+WindowState decode_window_state(uint8_t lock, uint8_t sash);
+
+const char *window_state_to_string(WindowState state);
+const char *parse_result_to_string(ParseResult result);
+
+/// True when lock/sash/extra bytes differ from every value captured so far
+/// (candidate for battery low, tamper, ...).
+bool has_unexpected_bits(const SensorFrame &frame);
+
+/// Drops the X3D repeats (each event is sent 3 times ~20 ms apart with the same
+/// message number). A (device, msg#) pair is a duplicate only if seen within
+/// `window_ms`, so rolling / reset counters don't swallow real events.
+class Deduplicator {
+ public:
+  static constexpr size_t MAX_DEVICES = 32;
+
+  explicit Deduplicator(uint32_t window_ms = 5000) : window_ms_(window_ms) {}
+
+  /// Returns true if this frame is a new event and records it.
+  bool is_new(uint32_t device_id, uint8_t msg_no, uint32_t now_ms);
+
+ protected:
+  struct Entry {
+    uint32_t device_id;
+    uint32_t last_ms;
+    uint8_t msg_no;
+    bool used;
+  };
+  Entry entries_[MAX_DEVICES]{};
+  uint32_t window_ms_;
+};
+
+}  // namespace esphome::x3d_rfm69

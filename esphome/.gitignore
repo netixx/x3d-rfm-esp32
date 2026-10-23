@@ -1,0 +1,4 @@
+tests/test_x3d_frame
+secrets.yaml
+.esphome/
+__pycache__/

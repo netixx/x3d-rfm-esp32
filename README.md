@@ -27,6 +27,8 @@ X3D Messages: [X3D-Message-Log.md](X3D-Message-Log.md)
 
 [List of X3D Devices](devices/)
 
+ESPHome component for K•LINE DVI window sensors (receive only, Home Assistant integration): [esphome/](esphome/README.md)
+
 ## Wireing
 
 used:
