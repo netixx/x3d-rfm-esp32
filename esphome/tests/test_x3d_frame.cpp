@@ -185,6 +185,21 @@ static void test_parse_any_frame() {
   CHECK(parse_frame(buf, sizeof(buf), &f) == ParseResult::BAD_CRC);
 }
 
+// Field report: at 8 MHz SPI the MSB of each FIFO byte copied the previous one.
+static void test_msb_misread_frame() {
+  static const uint8_t MISREAD[] = {0x13, 0xff, 0x9e, 0x00, 0x2d, 0x74, 0xac, 0xef, 0x84, 0x41,
+                                    0x02, 0x80, 0x40, 0x00, 0x00, 0x7c, 0xea, 0x08, 0x32, 0x99};
+  static const uint8_t CORRECT[] = {0x13, 0xff, 0x1e, 0x00, 0x2d, 0xf4, 0xac, 0xef, 0x04, 0x41,
+                                    0x82, 0x00, 0x40, 0x00, 0x00, 0xfc, 0x6a, 0x08, 0xb2};
+  X3DFrame common{};
+  CHECK(parse_frame(MISREAD, sizeof(MISREAD), &common) == ParseResult::BAD_CRC);
+  SensorFrame f{};
+  CHECK(parse_sensor_frame(CORRECT, sizeof(CORRECT), &f) == ParseResult::OK);
+  CHECK(f.device_id == 0xEFACF4);
+  CHECK(f.state == HandleState::UNLOCKED);
+  CHECK(std::strcmp(sensor_kind_to_string(f), "sliding") == 0);
+}
+
 static void test_decode_state() {
   CHECK(decode_handle_state(0x41) == HandleState::UNLOCKED);
   CHECK(decode_handle_state(0x01) == HandleState::LOCKED);
@@ -251,6 +266,7 @@ int main() {
   test_trailing_garbage();
   test_corruption();
   test_parse_any_frame();
+  test_msb_misread_frame();
   test_decode_state();
   test_replay_capture();
   test_dedup();

@@ -167,7 +167,9 @@ CONFIG_SCHEMA = (
         }
     )
     .extend(cv.COMPONENT_SCHEMA)
-    .extend(spi.spi_device_schema(cs_pin_required=True, default_data_rate=8e6))
+    # 1 MHz: at 8 MHz the ESP32 samples MISO too early in burst reads and the MSB
+    # of each FIFO byte takes the previous byte's value (bad CRC on every frame).
+    .extend(spi.spi_device_schema(cs_pin_required=True, default_data_rate=1e6))
 )
 
 

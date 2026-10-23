@@ -28,6 +28,10 @@ wire antenna on the ANT pad.
 `dio0_pin` is optional. Without it the component polls the radio over SPI in
 every loop iteration.
 
+The SPI clock defaults to 1 MHz. Faster clocks (`data_rate: 8MHz`) can make
+the ESP32 sample MISO too early during FIFO reads: the MSB of each byte then
+copies the previous byte's MSB, and every frame fails with "bad CRC".
+
 ## Install
 
 Add the component straight from GitHub in your device YAML:

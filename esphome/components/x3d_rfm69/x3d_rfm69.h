@@ -92,7 +92,7 @@ class X3DOpening {
 
 class X3DRFM69 : public Component,
                  public spi::SPIDevice<spi::BIT_ORDER_MSB_FIRST, spi::CLOCK_POLARITY_LOW, spi::CLOCK_PHASE_LEADING,
-                                       spi::DATA_RATE_8MHZ> {
+                                       spi::DATA_RATE_1MHZ> {
  public:
   float get_setup_priority() const override { return setup_priority::DATA; }
   void setup() override;
