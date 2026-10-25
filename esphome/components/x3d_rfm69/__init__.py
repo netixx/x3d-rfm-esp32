@@ -63,12 +63,13 @@ def x3d_device_id(value):
     return value
 
 
-def _fill_opening_entities(value):
+def _fill_opening_entities(value, shared_device=False):
     """Create the entity configs of an opening (window or door), named after it.
 
     `lock` is on by default, `tilt`, `state` and `rssi` with `true`. Each one takes entity
     options, or `false` to disable it. With `device:`, entities go to that
-    sub-device and are named "Lock", "State", "RSSI".
+    sub-device and are named "Lock", "State", ... When several openings share the
+    sub-device (sashes of one window or door), they are named "<name> lock", ...
     """
     if not isinstance(value, dict):
         raise cv.Invalid("Expected a mapping with 'device_id' and 'name'")
@@ -87,7 +88,10 @@ def _fill_opening_entities(value):
         entity = dict(entity)
         if device is not None:
             entity.setdefault(CONF_DEVICE_ID, device)
-            entity.setdefault(CONF_NAME, sub_device_name)
+            if shared_device and name is not None:
+                entity.setdefault(CONF_NAME, f"{name} {suffix}")
+            else:
+                entity.setdefault(CONF_NAME, sub_device_name)
         elif name is not None:
             entity.setdefault(CONF_NAME, f"{name} {suffix}")
         value[key] = entity
@@ -95,7 +99,6 @@ def _fill_opening_entities(value):
 
 
 OPENING_SCHEMA = cv.All(
-    _fill_opening_entities,
     cv.Schema(
         {
             cv.GenerateID(): cv.declare_id(X3DOpening),
@@ -128,6 +131,23 @@ OPENING_SCHEMA = cv.All(
 )
 
 
+def _fill_openings(value):
+    """Fill the entity configs of every opening; needs the whole list to know
+    which sub-devices are shared."""
+    if not isinstance(value, list):
+        value = [value]
+    devices = [o.get(CONF_DEVICE) for o in value if isinstance(o, dict)]
+    return [
+        _fill_opening_entities(
+            o,
+            shared_device=isinstance(o, dict)
+            and o.get(CONF_DEVICE) is not None
+            and devices.count(o.get(CONF_DEVICE)) > 1,
+        )
+        for o in value
+    ]
+
+
 def _unique_device_ids(openings):
     seen = set()
     for opening in openings:
@@ -154,7 +174,7 @@ CONFIG_SCHEMA = (
             # Publish the last saved handle position at boot.
             cv.Optional(CONF_RESTORE_STATE, default=True): cv.boolean,
             cv.Optional(CONF_OPENINGS, default=[]): cv.All(
-                cv.ensure_list(OPENING_SCHEMA), _unique_device_ids
+                _fill_openings, cv.ensure_list(OPENING_SCHEMA), _unique_device_ids
             ),
             # Last event of any device, claimed or not: "0xEFCC85 'Tilt window': unlocked (...)"
             cv.Optional(CONF_LAST_FRAME): text_sensor.text_sensor_schema(

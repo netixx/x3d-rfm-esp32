@@ -106,25 +106,46 @@ are device `0xEFCC85`. Copy IDs from the logs or `last_frame`, which print them
 in the right order. If an opening is configured with the raw byte order, a
 warning at boot-time traffic tells you which value to use.
 
-To show each opening as its own device in Home Assistant (with its own area),
-declare a [sub-device](https://esphome.io/components/esphome/#sub-devices) and
-reference it with `device:`. Its entities are then named `Lock`, `Tilted`,
-`State` and `RSSI` inside that device:
+### Devices and multi-sash openings
+
+By default all entities belong to the ESP's own device in Home Assistant. To
+show a window or door as its own device (with its own area), declare an ESPHome
+[sub-device](https://esphome.io/components/esphome/#sub-devices) and reference
+it with `device:`. Its entities are then named `Lock`, `Tilted`, `State` and
+`RSSI` inside that device.
+
+A window or sliding door with two sashes ("vantaux") has one DVI per sash.
+Point both sashes to the same device; entities are then named after each sash
+so they don't clash (`Left lock`, `Right lock`):
 
 ```yaml
 esphome:
   devices:
     - id: tilt_window
       name: "Tilt window"
-      area_id: bathroom      # optional, from esphome: areas:
+      area_id: bathroom        # optional, from esphome: areas:
+    - id: living_room_door
+      name: "Living room sliding door"
 
 x3d_rfm69:
   openings:
     - device_id: 0xEFCC85
       name: "Tilt window"
       device: tilt_window
-      tilt: true
+      tilt: true               # entities: Lock, Tilted
+    - device_id: 0xEFA00B
+      name: "Left"
+      device: living_room_door # entities: Left lock
+    - device_id: 0xEFACF4
+      name: "Right"
+      device: living_room_door # entities: Right lock
 ```
+
+Home Assistant has no entity type for a multi-sash opening. For one state for
+the whole door, add a **Group** helper (*Settings → Devices & services →
+Helpers → Create helper → Group → Binary sensor group*) with both lock sensors
+and device class *Lock*. With *All entities* off (the default), the group is
+*Unlocked* as soon as one sash is unlocked.
 
 ## Finding device IDs
 
