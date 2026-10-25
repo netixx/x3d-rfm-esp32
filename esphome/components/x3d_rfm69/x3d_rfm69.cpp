@@ -241,13 +241,22 @@ X3DOpening *X3DRFM69::find_opening_(uint32_t device_id) {
   return nullptr;
 }
 
-X3DOpening *X3DRFM69::opening_for_(uint32_t device_id, const char *name) {
-  X3DOpening *opening = this->find_opening_(device_id);
-  if (opening == nullptr) {
-    // Lives as long as the firmware. Unnamed entities fall back to "?" in the logs.
-    opening = new X3DOpening(device_id, name != nullptr ? name : "?");  // NOLINT(cppcoreguidelines-owning-memory)
-    this->openings_.push_back(opening);
-  }
+X3DOpening *X3DRFM69::opening_for_(uint32_t x3d_id, EntityBase *entity) {
+  X3DOpening *opening = this->find_opening_(x3d_id);
+  if (opening != nullptr)
+    return opening;
+  // Label used in the logs: the HA sub-device ("Bathroom window") when the
+  // entity has one, else the entity name.
+  const char *name = nullptr;
+#ifdef USE_DEVICES
+  if (entity->get_device() != nullptr)
+    name = entity->get_device()->get_name();
+#endif
+  if (name == nullptr && !entity->get_name().empty())
+    name = entity->get_name().c_str();
+  // Lives as long as the firmware.
+  opening = new X3DOpening(x3d_id, name != nullptr ? name : "?");  // NOLINT(cppcoreguidelines-owning-memory)
+  this->openings_.push_back(opening);
   return opening;
 }
 
@@ -267,8 +276,8 @@ void X3DRFM69::check_reversed_id_(uint32_t device_id, const char *id_str) {
   const uint32_t reversed = (device_id & 0xFF) << 16 | (device_id & 0xFF00) | (device_id >> 16 & 0xFF);
   X3DOpening *opening = this->find_opening_(reversed);
   if (opening != nullptr && reversed != device_id && this->first_sighting_(device_id)) {
-    ESP_LOGW(TAG, "'%s' is configured with device_id 0x%06" PRIX32 ", the raw byte order of device 0x%s. Use "
-             "'device_id: 0x%s'", opening->get_name(), reversed, id_str, id_str);
+    ESP_LOGW(TAG, "'%s' is configured with x3d_id 0x%06" PRIX32 ", the raw byte order of device 0x%s. Use "
+             "'x3d_id: 0x%s'", opening->get_name(), reversed, id_str, id_str);
   }
 }
 
@@ -330,7 +339,7 @@ void X3DRFM69::handle_frame_(const uint8_t *buf, size_t len, float rssi) {
   if (opening == nullptr) {
     if (this->log_unclaimed_devices_) {
       this->first_sighting_(frame.device_id);
-      ESP_LOGI(TAG, "Unclaimed device 0x%s (%s): %s, %.1f dBm -> add it under 'openings:' with 'device_id: 0x%s'",
+      ESP_LOGI(TAG, "Unclaimed device 0x%s (%s): %s, %.1f dBm -> claim it with 'x3d_id: 0x%s'",
                id_str, kind_str, shown_str, rssi, id_str);
     } else {
       ESP_LOGD(TAG, "Unclaimed device 0x%s (%s): %s, msg 0x%02X, %.1f dBm", id_str, kind_str, shown_str,

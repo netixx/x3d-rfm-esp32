@@ -1,45 +1,43 @@
-"""`binary_sensor: - platform: x3d_rfm69`: lock / tilt entities declared by hand."""
+"""`binary_sensor: - platform: x3d_rfm69`: handle lock or tilt of one X3D device."""
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import binary_sensor
-from esphome.const import CONF_DEVICE_ID, DEVICE_CLASS_LOCK
+from esphome.const import CONF_TYPE, DEVICE_CLASS_LOCK
 
 from .. import (
-    CONF_LOCK,
-    CONF_TILT,
+    CONF_X3D_ID,
     CONF_X3D_RFM69_ID,
-    X3D_PLATFORM_SCHEMA,
-    platform_final_validate,
+    X3D_ENTITY_SCHEMA,
+    unique_entity_final_validate,
 )
 
 DEPENDENCIES = ["x3d_rfm69"]
 
-CONFIG_SCHEMA = cv.All(
-    X3D_PLATFORM_SCHEMA.extend(
-        {
-            # Handle position. Home Assistant "lock" class: ON = unlocked
-            cv.Optional(CONF_LOCK): binary_sensor.binary_sensor_schema(
-                device_class=DEVICE_CLASS_LOCK,
-            ),
-            # Handle in tilt position. ON = tilted
-            cv.Optional(CONF_TILT): binary_sensor.binary_sensor_schema(
-                icon="mdi:window-open-variant",
-            ),
-        }
-    ),
-    cv.has_at_least_one_key(CONF_LOCK, CONF_TILT),
+TYPE_LOCK = "lock"
+TYPE_TILT = "tilt"
+
+CONFIG_SCHEMA = cv.typed_schema(
+    {
+        # Home Assistant "lock" class: shown as Locked / Unlocked, ON = unlocked
+        TYPE_LOCK: binary_sensor.binary_sensor_schema(
+            device_class=DEVICE_CLASS_LOCK,
+        ).extend(X3D_ENTITY_SCHEMA),
+        # Handle in tilt position (tilt / tilt-and-turn windows). ON = tilted
+        TYPE_TILT: binary_sensor.binary_sensor_schema(
+            icon="mdi:window-open-variant",
+        ).extend(X3D_ENTITY_SCHEMA),
+    },
+    default_type=TYPE_LOCK,
 )
 
-
-FINAL_VALIDATE_SCHEMA = platform_final_validate(CONF_LOCK, CONF_TILT)
+FINAL_VALIDATE_SCHEMA = unique_entity_final_validate("binary_sensor", TYPE_LOCK)
 
 
 async def to_code(config):
     hub = await cg.get_variable(config[CONF_X3D_RFM69_ID])
-    if lock_config := config.get(CONF_LOCK):
-        sens = await binary_sensor.new_binary_sensor(lock_config)
-        cg.add(hub.add_lock_sensor(config[CONF_DEVICE_ID], sens))
-    if tilt_config := config.get(CONF_TILT):
-        sens = await binary_sensor.new_binary_sensor(tilt_config)
-        cg.add(hub.add_tilt_sensor(config[CONF_DEVICE_ID], sens))
+    sens = await binary_sensor.new_binary_sensor(config)
+    if config[CONF_TYPE] == TYPE_LOCK:
+        cg.add(hub.add_lock_sensor(config[CONF_X3D_ID], sens))
+    else:
+        cg.add(hub.add_tilt_sensor(config[CONF_X3D_ID], sens))

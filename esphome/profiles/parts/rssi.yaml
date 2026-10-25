@@ -1,0 +1,6 @@
+sensor:
+  - platform: x3d_rfm69
+    id: ${sash}_rssi
+    x3d_id: ${x3d_id}
+    name: "${ (label ~ ' RSSI') if label else 'RSSI' }"
+    device_id: ${device}

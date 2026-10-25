@@ -1,0 +1,55 @@
+# Sliding door or window with two sliding sashes, one DVI per sash.
+# Creates an HA device "${name}" with "Left lock", "Right lock" and a combined
+# "Lock": unlocked as soon as one sash is, locked when both are.
+# Entity ids: ${id}_left_lock, ${id}_right_lock, ${id}_lock, and
+# ${id}_left_rssi... / ${id}_left_state... when enabled.
+#
+# vars:
+#   id:           unique id, used for the HA device and the entity ids
+#   name:         device name in Home Assistant
+#   left_x3d_id:  radio ID of the left sash ("0xEFA00B")
+#   right_x3d_id: radio ID of the right sash
+#   rssi:         true to add "Left RSSI" / "Right RSSI" (default false)
+#   state:        true to add "Left state" / "Right state" (default false)
+substitutions:
+  rssi: "false"
+  state: "false"
+
+esphome:
+  devices:
+    - id: ${id}
+      name: ${name}
+
+packages:
+  left: !include
+    file: parts/sash.yaml
+    vars:
+      sash: ${id}_left
+      label: Left
+      x3d_id: ${left_x3d_id}
+      device: ${id}
+      rssi: ${rssi}
+      state: ${state}
+  right: !include
+    file: parts/sash.yaml
+    vars:
+      sash: ${id}_right
+      label: Right
+      x3d_id: ${right_x3d_id}
+      device: ${id}
+      rssi: ${rssi}
+      state: ${state}
+
+binary_sensor:
+  - platform: template
+    id: ${id}_lock
+    name: Lock
+    device_id: ${id}
+    device_class: lock  # ON = unlocked
+    lambda: |-
+      // Unlocked as soon as one sash is, locked when both are, else unknown.
+      if (id(${id}_left_lock).state || id(${id}_right_lock).state)
+        return true;
+      if (id(${id}_left_lock).has_state() && id(${id}_right_lock).has_state())
+        return false;
+      return {};

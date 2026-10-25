@@ -1,0 +1,30 @@
+# Window with one sash and one DVI.
+# Creates an HA device "${name}" with a "Lock" entity (shown as Locked / Unlocked).
+# Entity ids: ${id}_lock, and ${id}_rssi / ${id}_state when enabled.
+#
+# vars:
+#   id:     unique id, used for the HA device and the entity ids
+#   name:   device name in Home Assistant
+#   x3d_id: radio ID, as printed in the logs ("0xEFCC85")
+#   rssi:   true to add an "RSSI" sensor (default false)
+#   state:  true to add a "State" text sensor, locked / unlocked (default false)
+substitutions:
+  rssi: "false"
+  state: "false"
+
+esphome:
+  devices:
+    - id: ${id}
+      name: ${name}
+
+packages:
+  sash: !include
+    file: parts/sash.yaml
+    vars:
+      sash: ${id}
+      label: ""
+      x3d_id: ${x3d_id}
+      device: ${id}
+      tilt: "false"
+      rssi: ${rssi}
+      state: ${state}

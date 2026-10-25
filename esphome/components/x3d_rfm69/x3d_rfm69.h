@@ -17,9 +17,7 @@
 
 namespace esphome::x3d_rfm69 {
 
-class X3DGroup;
-
-/// One window or door declared under `openings:`, owning its entities.
+/// Entities of one X3D device (one sash of a window or door), grouped by the hub.
 class X3DOpening {
  public:
   X3DOpening(uint32_t device_id, const char *name) : device_id_(device_id), name_(name) {}
@@ -29,12 +27,8 @@ class X3DOpening {
   void set_state_sensor(text_sensor::TextSensor *sensor) { this->state_ = sensor; }
   void set_rssi_sensor(sensor::Sensor *sensor) { this->rssi_ = sensor; }
 
-  void set_group(X3DGroup *group) { this->group_ = group; }
-
   uint32_t get_device_id() const { return this->device_id_; }
   const char *get_name() const { return this->name_; }
-  /// Last known handle position; UNCHANGED until the first event (or restore).
-  HandleState get_handle_state() const { return this->handle_; }
 
   /// Publish the last handle position saved in flash, so entities aren't
   /// "unknown" after a reboot until the handle moves again.
@@ -75,63 +69,26 @@ class X3DOpening {
   static constexpr uint8_t SAVED_UNLOCKED = 2;
   static constexpr uint8_t SAVED_TILTED = 3;
 
-  void publish_handle_(HandleState state, bool tilted);
+  void publish_handle_(HandleState state, bool tilted) {
+    // Home Assistant lock device class: ON means unlocked.
+    if (this->lock_ != nullptr)
+      this->lock_->publish_state(state == HandleState::UNLOCKED);
+    if (this->tilt_ != nullptr)
+      this->tilt_->publish_state(tilted);
+    if (this->state_ != nullptr)
+      this->state_->publish_state(handle_state_to_string(state));
+  }
 
   uint32_t device_id_;
   const char *name_;
   ESPPreferenceObject pref_;
   uint8_t saved_{0};
   bool restore_{false};
-  HandleState handle_{HandleState::UNCHANGED};
-  X3DGroup *group_{nullptr};
   binary_sensor::BinarySensor *lock_{nullptr};
   binary_sensor::BinarySensor *tilt_{nullptr};
   text_sensor::TextSensor *state_{nullptr};
   sensor::Sensor *rssi_{nullptr};
 };
-
-/// Openings sharing one sub-device (sashes of a window or door), with a
-/// combined lock entity: unlocked if any sash is, locked when all are.
-class X3DGroup {
- public:
-  void set_lock_sensor(binary_sensor::BinarySensor *sensor) { this->lock_ = sensor; }
-  void add_opening(X3DOpening *opening) {
-    this->openings_.push_back(opening);
-    opening->set_group(this);
-  }
-
-  void update() {
-    bool all_locked = true;
-    for (auto *opening : this->openings_) {
-      const HandleState state = opening->get_handle_state();
-      if (state == HandleState::UNLOCKED) {
-        this->lock_->publish_state(true);  // lock device class: ON = unlocked
-        return;
-      }
-      if (state != HandleState::LOCKED)
-        all_locked = false;  // a sash not known yet
-    }
-    if (all_locked)
-      this->lock_->publish_state(false);
-  }
-
- protected:
-  binary_sensor::BinarySensor *lock_{nullptr};
-  std::vector<X3DOpening *> openings_;
-};
-
-inline void X3DOpening::publish_handle_(HandleState state, bool tilted) {
-  this->handle_ = state;
-  // Home Assistant lock device class: ON means unlocked.
-  if (this->lock_ != nullptr)
-    this->lock_->publish_state(state == HandleState::UNLOCKED);
-  if (this->tilt_ != nullptr)
-    this->tilt_->publish_state(tilted);
-  if (this->state_ != nullptr)
-    this->state_->publish_state(handle_state_to_string(state));
-  if (this->group_ != nullptr)
-    this->group_->update();
-}
 
 class X3DRFM69 : public Component,
                  public spi::SPIDevice<spi::BIT_ORDER_MSB_FIRST, spi::CLOCK_POLARITY_LOW, spi::CLOCK_PHASE_LEADING,
@@ -147,20 +104,19 @@ class X3DRFM69 : public Component,
   void set_log_unclaimed_devices(bool log) { this->log_unclaimed_devices_ = log; }
   void set_restore_state(bool restore) { this->restore_state_ = restore; }
 
-  void add_opening(X3DOpening *opening) { this->openings_.push_back(opening); }
-  /// Entities declared with `platform: x3d_rfm69`: attached to the opening of
-  /// that device, created on first use and named after the entity.
-  void add_lock_sensor(uint32_t device_id, binary_sensor::BinarySensor *sensor) {
-    this->opening_for_(device_id, sensor->get_name().c_str())->set_lock_sensor(sensor);
+  /// `platform: x3d_rfm69` entities: attached to the opening of their X3D
+  /// device, created on first use.
+  void add_lock_sensor(uint32_t x3d_id, binary_sensor::BinarySensor *sensor) {
+    this->opening_for_(x3d_id, sensor)->set_lock_sensor(sensor);
   }
-  void add_tilt_sensor(uint32_t device_id, binary_sensor::BinarySensor *sensor) {
-    this->opening_for_(device_id, sensor->get_name().c_str())->set_tilt_sensor(sensor);
+  void add_tilt_sensor(uint32_t x3d_id, binary_sensor::BinarySensor *sensor) {
+    this->opening_for_(x3d_id, sensor)->set_tilt_sensor(sensor);
   }
-  void add_state_sensor(uint32_t device_id, text_sensor::TextSensor *sensor) {
-    this->opening_for_(device_id, sensor->get_name().c_str())->set_state_sensor(sensor);
+  void add_state_sensor(uint32_t x3d_id, text_sensor::TextSensor *sensor) {
+    this->opening_for_(x3d_id, sensor)->set_state_sensor(sensor);
   }
-  void add_rssi_sensor(uint32_t device_id, sensor::Sensor *sensor) {
-    this->opening_for_(device_id, sensor->get_name().c_str())->set_rssi_sensor(sensor);
+  void add_rssi_sensor(uint32_t x3d_id, sensor::Sensor *sensor) {
+    this->opening_for_(x3d_id, sensor)->set_rssi_sensor(sensor);
   }
   /// Hub-wide text sensor showing the last event of any device (discovery).
   void set_last_frame_sensor(text_sensor::TextSensor *sensor) { this->last_frame_ = sensor; }
@@ -179,7 +135,7 @@ class X3DRFM69 : public Component,
   void read_and_handle_packet_();
   void handle_frame_(const uint8_t *buf, size_t len, float rssi);
   X3DOpening *find_opening_(uint32_t device_id);
-  X3DOpening *opening_for_(uint32_t device_id, const char *name);
+  X3DOpening *opening_for_(uint32_t x3d_id, EntityBase *entity);
   /// True the first time an unclaimed device is seen since boot.
   bool first_sighting_(uint32_t device_id);
   /// Warn once if an opening was configured with the ID in raw (byte-reversed) order.

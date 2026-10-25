@@ -1,0 +1,7 @@
+binary_sensor:
+  - platform: x3d_rfm69
+    id: ${sash}_tilted
+    x3d_id: ${x3d_id}
+    type: tilt
+    name: "${ (label ~ ' tilted') if label else 'Tilted' }"
+    device_id: ${device}

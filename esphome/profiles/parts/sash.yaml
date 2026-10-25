@@ -1,0 +1,27 @@
+# One sash (one DVI): lock entity, plus optional tilt / rssi / state.
+# Included by the profiles, not meant to be used directly.
+# vars: sash (entity id prefix), label ("" or "Left"...), x3d_id, device,
+#       tilt, rssi, state ("true" / "false")
+substitutions:
+  tilt: "false"
+  rssi: "false"
+  state: "false"
+
+binary_sensor:
+  - platform: x3d_rfm69
+    id: ${sash}_lock
+    x3d_id: ${x3d_id}
+    type: lock
+    name: "${ (label ~ ' lock') if label else 'Lock' }"
+    device_id: ${device}
+
+packages:
+  tilt: !include
+    file: tilt.yaml
+    condition: ${tilt}
+  rssi: !include
+    file: rssi.yaml
+    condition: ${rssi}
+  state: !include
+    file: state.yaml
+    condition: ${state}

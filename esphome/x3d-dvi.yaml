@@ -2,13 +2,8 @@
 # ("ouvrants") -> Home Assistant.
 # ESP32 DevKit V1 + RFM69HW 868 MHz, wiring in esphome/README.md.
 #
-# Two ways to get openings into Home Assistant, both enabled below:
-#  A. Map IDs in Home Assistant: every event of every device is sent as an
-#     "esphome.x3d_opening" HA event. See homeassistant/x3d_openings.yaml.
-#     Adding an opening needs no reflash.
-#  B. Map IDs here: list each opening under "openings:" with its device_id
-#     and name, ESPHome creates native entities.
-#
+# Each window or door is one package include: pick the profile matching the
+# opening, give it an id, a name and its radio ID(s) from the logs.
 # The DVI reads the handle: locked / unlocked, and the tilt position on tilt
 # windows. Opening the sash doesn't send anything.
 
@@ -48,42 +43,46 @@ spi:
   mosi_pin: GPIO23
 
 x3d_rfm69:
-  id: x3d_radio
   cs_pin: GPIO5
   dio0_pin: GPIO4
-  frequency: 868.95MHz
-  # Discovery: log what devices not listed under "openings:" send at INFO,
-  # with their ID. Listed (claimed) devices log at DEBUG.
+  # Discovery: what devices without entities send is logged at INFO, with
+  # their ID. Devices with entities (claimed) log at DEBUG.
   log_unclaimed_devices: true
   # Publish the last saved handle position at boot (entities not "unknown").
   restore_state: true
-  # Last event of any device: turn each handle and read its ID here or in the logs.
-  last_frame:
+
+# One include per window or door. Profiles: window, door, sliding_door,
+# tilt_window, double_window, double_sliding_door (esphome/profiles/).
+# Optional vars: rssi: true, state: true.
+packages:
+  bathroom_window:
+    url: https://github.com/netixx/x3d-rfm-esp32
+    ref: esphome-x3d-dvi
+    files:
+      - path: esphome/profiles/tilt_window.yaml
+        vars:
+          id: bathroom_window
+          name: "Bathroom window"
+          x3d_id: "0xEFCC85"
+  living_room_door:
+    url: https://github.com/netixx/x3d-rfm-esp32
+    ref: esphome-x3d-dvi
+    files:
+      - path: esphome/profiles/double_sliding_door.yaml
+        vars:
+          id: living_room_door
+          name: "Living room door"
+          left_x3d_id: "0xEFA00B"
+          right_x3d_id: "0xEFACF4"
+          rssi: true
+
+# Customize any generated entity by its id with ESPHome's !extend.
+binary_sensor:
+  - id: !extend bathroom_window_lock
+    icon: mdi:window-closed-variant
+
+text_sensor:
+  # Last frame of any device: turn each handle and read its ID here or in the logs.
+  - platform: x3d_rfm69
+    type: last_frame
     name: "Last X3D frame"
-  # Option B: one entry per window or door, device_id taken from the logs /
-  # "Last X3D frame". Creates the binary sensor "<name> lock" (shown as
-  # Locked / Unlocked). Optional, with "true":
-  #   tilt:  binary sensor "<name> tilted", for tilt windows
-  #   state: text sensor, locked / unlocked
-  #   rssi:  signal strength, dBm
-  # Each key also takes entity options (icon, internal, ...); "lock: false" disables it.
-  openings:
-    - device_id: 0xEFCC85
-      name: "Tilt window"
-      tilt: true
-    - device_id: 0xEFA00B
-      name: "Sliding door"
-      rssi: true
-  # Option A: forward every event to Home Assistant, once per real event
-  # (radio repeats are dropped). Variables: device_id ("EFCC85"),
-  # state (locked / unlocked / unchanged), tilted (bool),
-  # kind (window / sliding / other), rssi (dBm), raw (hex).
-  on_opening_event:
-    - homeassistant.event:
-        event: esphome.x3d_opening
-        data:
-          device_id: !lambda "return device_id;"
-          state: !lambda "return state;"
-          tilted: !lambda 'return tilted ? "true" : "false";'
-          kind: !lambda "return kind;"
-          rssi: !lambda "return str_sprintf(\"%.1f\", rssi);"
