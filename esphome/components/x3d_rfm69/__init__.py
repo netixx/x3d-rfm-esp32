@@ -37,6 +37,10 @@ CONF_RSSI = "rssi"
 x3d_rfm69_ns = cg.esphome_ns.namespace("x3d_rfm69")
 X3DRFM69 = x3d_rfm69_ns.class_("X3DRFM69", cg.Component, spi.SPIDevice)
 X3DOpening = x3d_rfm69_ns.class_("X3DOpening")
+X3DGroup = x3d_rfm69_ns.class_("X3DGroup")
+
+# Internal key: combined lock of each sub-device shared by several openings.
+CONF_GROUPS = "groups"
 
 # Entities of each opening: config key -> (name suffix, name inside a sub-device, on by default)
 OPENING_ENTITIES = {
@@ -158,7 +162,33 @@ def _unique_device_ids(openings):
     return openings
 
 
-CONFIG_SCHEMA = (
+def _add_device_groups(config):
+    """For each sub-device shared by several openings (sashes of one window or
+    door), add a combined "Lock" entity on that device."""
+    members = {}
+    for index, opening in enumerate(config.get(CONF_OPENINGS, [])):
+        if (device := opening.get(CONF_DEVICE)) is not None:
+            members.setdefault(device.id, []).append(index)
+    groups = []
+    for device, indexes in members.items():
+        if len(indexes) < 2:
+            continue
+        lock = binary_sensor.binary_sensor_schema(device_class=DEVICE_CLASS_LOCK)(
+            {CONF_NAME: "Lock", CONF_DEVICE_ID: device}
+        )
+        groups.append(
+            {
+                CONF_ID: cv.declare_id(X3DGroup)(None),
+                "openings": indexes,
+                CONF_LOCK: lock,
+            }
+        )
+    config = dict(config)
+    config[CONF_GROUPS] = groups
+    return config
+
+
+CONFIG_SCHEMA = cv.All(
     cv.Schema(
         {
             cv.GenerateID(): cv.declare_id(X3DRFM69),
@@ -189,7 +219,8 @@ CONFIG_SCHEMA = (
     .extend(cv.COMPONENT_SCHEMA)
     # 1 MHz: at 8 MHz the ESP32 samples MISO too early in burst reads and the MSB
     # of each FIFO byte takes the previous byte's value (bad CRC on every frame).
-    .extend(spi.spi_device_schema(cs_pin_required=True, default_data_rate=1e6))
+    .extend(spi.spi_device_schema(cs_pin_required=True, default_data_rate=1e6)),
+    _add_device_groups,
 )
 
 
@@ -205,6 +236,7 @@ async def to_code(config):
     cg.add(var.set_log_unclaimed_devices(config[CONF_LOG_UNCLAIMED_DEVICES]))
     cg.add(var.set_restore_state(config[CONF_RESTORE_STATE]))
 
+    openings = []
     for opening_config in config[CONF_OPENINGS]:
         opening = cg.new_Pvariable(
             opening_config[CONF_ID],
@@ -212,6 +244,7 @@ async def to_code(config):
             opening_config[CONF_NAME],
         )
         cg.add(var.add_opening(opening))
+        openings.append(opening)
         if lock_config := opening_config.get(CONF_LOCK):
             sens = await binary_sensor.new_binary_sensor(lock_config)
             cg.add(opening.set_lock_sensor(sens))
@@ -224,6 +257,13 @@ async def to_code(config):
         if rssi_config := opening_config.get(CONF_RSSI):
             sens = await sensor.new_sensor(rssi_config)
             cg.add(opening.set_rssi_sensor(sens))
+
+    for group_config in config[CONF_GROUPS]:
+        group = cg.new_Pvariable(group_config[CONF_ID])
+        sens = await binary_sensor.new_binary_sensor(group_config[CONF_LOCK])
+        cg.add(group.set_lock_sensor(sens))
+        for index in group_config["openings"]:
+            cg.add(group.add_opening(openings[index]))
 
     if last_frame_config := config.get(CONF_LAST_FRAME):
         sens = await text_sensor.new_text_sensor(last_frame_config)

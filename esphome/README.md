@@ -135,17 +135,21 @@ x3d_rfm69:
       tilt: true               # entities: Lock, Tilted
     - device_id: 0xEFA00B
       name: "Left"
-      device: living_room_door # entities: Left lock
+      device: living_room_door # entities: Left lock (+ combined Lock)
     - device_id: 0xEFACF4
       name: "Right"
       device: living_room_door # entities: Right lock
 ```
 
-Home Assistant has no entity type for a multi-sash opening. For one state for
-the whole door, add a **Group** helper (*Settings → Devices & services →
-Helpers → Create helper → Group → Binary sensor group*) with both lock sensors
-and device class *Lock*. With *All entities* off (the default), the group is
-*Unlocked* as soon as one sash is unlocked.
+A shared device also gets a combined **`Lock`** entity for the whole window
+or door: *Unlocked* as soon as one sash is unlocked, *Locked* when every sash
+is locked (nothing is published while a sash is still unknown and none is
+unlocked). The door above shows `Lock`, `Left lock` and `Right lock`.
+
+Home Assistant has no entity type for a multi-sash opening. To combine
+openings that aren't on the same device, use a **Group** helper there
+(*Settings → Devices & services → Helpers → Create helper → Group → Binary
+sensor group*, device class *Lock*).
 
 ## Finding device IDs
 

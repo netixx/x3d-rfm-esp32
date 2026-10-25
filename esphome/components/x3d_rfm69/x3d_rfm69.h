@@ -17,6 +17,8 @@
 
 namespace esphome::x3d_rfm69 {
 
+class X3DGroup;
+
 /// One window or door declared under `openings:`, owning its entities.
 class X3DOpening {
  public:
@@ -27,8 +29,12 @@ class X3DOpening {
   void set_state_sensor(text_sensor::TextSensor *sensor) { this->state_ = sensor; }
   void set_rssi_sensor(sensor::Sensor *sensor) { this->rssi_ = sensor; }
 
+  void set_group(X3DGroup *group) { this->group_ = group; }
+
   uint32_t get_device_id() const { return this->device_id_; }
   const char *get_name() const { return this->name_; }
+  /// Last known handle position; UNCHANGED until the first event (or restore).
+  HandleState get_handle_state() const { return this->handle_; }
 
   /// Publish the last handle position saved in flash, so entities aren't
   /// "unknown" after a reboot until the handle moves again.
@@ -69,26 +75,63 @@ class X3DOpening {
   static constexpr uint8_t SAVED_UNLOCKED = 2;
   static constexpr uint8_t SAVED_TILTED = 3;
 
-  void publish_handle_(HandleState state, bool tilted) {
-    // Home Assistant lock device class: ON means unlocked.
-    if (this->lock_ != nullptr)
-      this->lock_->publish_state(state == HandleState::UNLOCKED);
-    if (this->tilt_ != nullptr)
-      this->tilt_->publish_state(tilted);
-    if (this->state_ != nullptr)
-      this->state_->publish_state(handle_state_to_string(state));
-  }
+  void publish_handle_(HandleState state, bool tilted);
 
   uint32_t device_id_;
   const char *name_;
   ESPPreferenceObject pref_;
   uint8_t saved_{0};
   bool restore_{false};
+  HandleState handle_{HandleState::UNCHANGED};
+  X3DGroup *group_{nullptr};
   binary_sensor::BinarySensor *lock_{nullptr};
   binary_sensor::BinarySensor *tilt_{nullptr};
   text_sensor::TextSensor *state_{nullptr};
   sensor::Sensor *rssi_{nullptr};
 };
+
+/// Openings sharing one sub-device (sashes of a window or door), with a
+/// combined lock entity: unlocked if any sash is, locked when all are.
+class X3DGroup {
+ public:
+  void set_lock_sensor(binary_sensor::BinarySensor *sensor) { this->lock_ = sensor; }
+  void add_opening(X3DOpening *opening) {
+    this->openings_.push_back(opening);
+    opening->set_group(this);
+  }
+
+  void update() {
+    bool all_locked = true;
+    for (auto *opening : this->openings_) {
+      const HandleState state = opening->get_handle_state();
+      if (state == HandleState::UNLOCKED) {
+        this->lock_->publish_state(true);  // lock device class: ON = unlocked
+        return;
+      }
+      if (state != HandleState::LOCKED)
+        all_locked = false;  // a sash not known yet
+    }
+    if (all_locked)
+      this->lock_->publish_state(false);
+  }
+
+ protected:
+  binary_sensor::BinarySensor *lock_{nullptr};
+  std::vector<X3DOpening *> openings_;
+};
+
+inline void X3DOpening::publish_handle_(HandleState state, bool tilted) {
+  this->handle_ = state;
+  // Home Assistant lock device class: ON means unlocked.
+  if (this->lock_ != nullptr)
+    this->lock_->publish_state(state == HandleState::UNLOCKED);
+  if (this->tilt_ != nullptr)
+    this->tilt_->publish_state(tilted);
+  if (this->state_ != nullptr)
+    this->state_->publish_state(handle_state_to_string(state));
+  if (this->group_ != nullptr)
+    this->group_->update();
+}
 
 class X3DRFM69 : public Component,
                  public spi::SPIDevice<spi::BIT_ORDER_MSB_FIRST, spi::CLOCK_POLARITY_LOW, spi::CLOCK_PHASE_LEADING,
