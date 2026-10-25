@@ -1,0 +1,18 @@
+# One X3D opening (window or door): ESPHome-native alternative to `openings:`.
+# Include it once per opening with packages + vars:
+#
+#   packages:
+#     tilt_window: !include
+#       file: packages/x3d_opening.yaml
+#       vars:
+#         device_id: "0xEFCC85"
+#         name: "Tilt window"
+#
+# Needs the x3d_rfm69 hub in the main configuration. Add more entities
+# (tilt, state, rssi) next to it with `platform: x3d_rfm69` as needed.
+
+binary_sensor:
+  - platform: x3d_rfm69
+    device_id: ${device_id}
+    lock:
+      name: "${name} lock"

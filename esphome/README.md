@@ -151,6 +151,51 @@ openings that aren't on the same device, use a **Group** helper there
 (*Settings → Devices & services → Helpers → Create helper → Group → Binary
 sensor group*, device class *Lock*).
 
+### Alternatives: platforms and packages
+
+`openings:` is a shortcut. The same entities can be declared one by one with
+`platform: x3d_rfm69`, where `device_id` says which device they belong to:
+
+```yaml
+binary_sensor:
+  - platform: x3d_rfm69
+    device_id: 0xEFCC85
+    lock:
+      name: "Tilt window lock"
+    tilt:
+      name: "Tilt window tilted"
+
+text_sensor:
+  - platform: x3d_rfm69
+    device_id: 0xEFCC85
+    state:
+      name: "Tilt window state"
+
+sensor:
+  - platform: x3d_rfm69
+    device_id: 0xEFCC85
+    rssi:
+      name: "Tilt window RSSI"
+```
+
+To avoid repeating that block per opening, use ESPHome's own templating:
+[`packages/x3d_opening.yaml`](packages/x3d_opening.yaml) is included once per
+opening with `vars`:
+
+```yaml
+packages:
+  tilt_window: !include
+    file: packages/x3d_opening.yaml
+    vars:
+      device_id: "0xEFCC85"
+      name: "Tilt window"
+```
+
+All three can be mixed. A device declared in `openings:` and with platforms
+shares one opening (same logs, restore and claim); declaring the same entity
+both ways is rejected. The combined `Lock` of multi-sash doors is only
+generated for `openings:` sharing a `device:`.
+
 ## Finding device IDs
 
 Flash with `log_unclaimed_devices: true` (the default), then turn each handle

@@ -241,6 +241,16 @@ X3DOpening *X3DRFM69::find_opening_(uint32_t device_id) {
   return nullptr;
 }
 
+X3DOpening *X3DRFM69::opening_for_(uint32_t device_id, const char *name) {
+  X3DOpening *opening = this->find_opening_(device_id);
+  if (opening == nullptr) {
+    // Lives as long as the firmware. Unnamed entities fall back to "?" in the logs.
+    opening = new X3DOpening(device_id, name != nullptr ? name : "?");  // NOLINT(cppcoreguidelines-owning-memory)
+    this->openings_.push_back(opening);
+  }
+  return opening;
+}
+
 bool X3DRFM69::first_sighting_(uint32_t device_id) {
   static constexpr size_t MAX_SIGHTED = 64;
   for (uint32_t id : this->sighted_) {

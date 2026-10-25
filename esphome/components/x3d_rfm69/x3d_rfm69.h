@@ -148,6 +148,20 @@ class X3DRFM69 : public Component,
   void set_restore_state(bool restore) { this->restore_state_ = restore; }
 
   void add_opening(X3DOpening *opening) { this->openings_.push_back(opening); }
+  /// Entities declared with `platform: x3d_rfm69`: attached to the opening of
+  /// that device, created on first use and named after the entity.
+  void add_lock_sensor(uint32_t device_id, binary_sensor::BinarySensor *sensor) {
+    this->opening_for_(device_id, sensor->get_name().c_str())->set_lock_sensor(sensor);
+  }
+  void add_tilt_sensor(uint32_t device_id, binary_sensor::BinarySensor *sensor) {
+    this->opening_for_(device_id, sensor->get_name().c_str())->set_tilt_sensor(sensor);
+  }
+  void add_state_sensor(uint32_t device_id, text_sensor::TextSensor *sensor) {
+    this->opening_for_(device_id, sensor->get_name().c_str())->set_state_sensor(sensor);
+  }
+  void add_rssi_sensor(uint32_t device_id, sensor::Sensor *sensor) {
+    this->opening_for_(device_id, sensor->get_name().c_str())->set_rssi_sensor(sensor);
+  }
   /// Hub-wide text sensor showing the last event of any device (discovery).
   void set_last_frame_sensor(text_sensor::TextSensor *sensor) { this->last_frame_ = sensor; }
   /// (device_id hex string, state, tilted, kind, rssi, raw frame hex), once per new event of any device.
@@ -165,6 +179,7 @@ class X3DRFM69 : public Component,
   void read_and_handle_packet_();
   void handle_frame_(const uint8_t *buf, size_t len, float rssi);
   X3DOpening *find_opening_(uint32_t device_id);
+  X3DOpening *opening_for_(uint32_t device_id, const char *name);
   /// True the first time an unclaimed device is seen since boot.
   bool first_sighting_(uint32_t device_id);
   /// Warn once if an opening was configured with the ID in raw (byte-reversed) order.
