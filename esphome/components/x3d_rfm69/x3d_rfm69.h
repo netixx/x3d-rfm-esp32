@@ -20,21 +20,21 @@ namespace esphome::x3d_rfm69 {
 /// Entities of one X3D device (one sash of a window or door), grouped by the hub.
 class X3DOpening {
  public:
-  X3DOpening(uint32_t device_id, const char *name) : device_id_(device_id), name_(name) {}
+  X3DOpening(uint32_t x3d_id, const char *name) : x3d_id_(x3d_id), name_(name) {}
 
   void set_lock_sensor(binary_sensor::BinarySensor *sensor) { this->lock_ = sensor; }
   void set_tilt_sensor(binary_sensor::BinarySensor *sensor) { this->tilt_ = sensor; }
   void set_state_sensor(text_sensor::TextSensor *sensor) { this->state_ = sensor; }
   void set_rssi_sensor(sensor::Sensor *sensor) { this->rssi_ = sensor; }
 
-  uint32_t get_device_id() const { return this->device_id_; }
+  uint32_t get_x3d_id() const { return this->x3d_id_; }
   const char *get_name() const { return this->name_; }
 
   /// Publish the last handle position saved in flash, so entities aren't
   /// "unknown" after a reboot until the handle moves again.
   void restore_state() {
     this->pref_ = global_preferences->make_preference<uint8_t>(fnv1_hash_extend(fnv1_hash("x3d_rfm69"),
-                                                                                this->device_id_));
+                                                                                this->x3d_id_));
     uint8_t saved;
     if (this->pref_.load(&saved) && saved >= SAVED_LOCKED && saved <= SAVED_TILTED) {
       this->saved_ = saved;
@@ -79,7 +79,7 @@ class X3DOpening {
       this->state_->publish_state(handle_state_to_string(state));
   }
 
-  uint32_t device_id_;
+  uint32_t x3d_id_;
   const char *name_;
   ESPPreferenceObject pref_;
   uint8_t saved_{0};
@@ -134,12 +134,12 @@ class X3DRFM69 : public Component,
   bool payload_ready_();
   void read_and_handle_packet_();
   void handle_frame_(const uint8_t *buf, size_t len, float rssi);
-  X3DOpening *find_opening_(uint32_t device_id);
+  X3DOpening *find_opening_(uint32_t x3d_id);
   X3DOpening *opening_for_(uint32_t x3d_id, EntityBase *entity);
   /// True the first time an unclaimed device is seen since boot.
-  bool first_sighting_(uint32_t device_id);
+  bool first_sighting_(uint32_t x3d_id);
   /// Warn once if an opening was configured with the ID in raw (byte-reversed) order.
-  void check_reversed_id_(uint32_t device_id, const char *id_str);
+  void check_reversed_id_(uint32_t x3d_id, const char *id_str);
 
   static void gpio_intr(X3DRFM69 *arg);
 

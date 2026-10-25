@@ -52,6 +52,11 @@ esphome run x3d-dvi.yaml
 
 On NixOS, `nix-shell -p esphome --run "esphome run x3d-dvi.yaml"` is enough.
 
+Tested with ESPHome 2026.10. The profiles use conditional `!include`, which
+older releases don't have. ESPHome caches GitHub sources for a day: add
+`refresh: 0s` to the `external_components` source and to each package to pick
+up changes right away.
+
 ## Declaring windows and doors
 
 Each window or door is one include of a **profile** package from

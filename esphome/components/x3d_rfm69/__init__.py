@@ -61,17 +61,19 @@ def unique_entity_final_validate(domain, default_type):
         )
 
     def validator(config):
-        if CONF_X3D_ID not in config:
-            return config
         same = [
             conf
             for conf in fv.full_config.get().get(domain, [])
             if conf.get(CONF_PLATFORM) == DOMAIN and key(conf) == key(config)
         ]
         if len(same) > 1:
+            owner = (
+                f"Device 0x{config[CONF_X3D_ID]:06X}"
+                if CONF_X3D_ID in config
+                else "The radio"
+            )
             raise cv.Invalid(
-                f"Device 0x{config[CONF_X3D_ID]:06X} has {len(same)} "
-                f"'{key(config)[2]}' {domain} entities, keep one"
+                f"{owner} has {len(same)} '{key(config)[2]}' {domain} entities, keep one"
             )
         return config
 

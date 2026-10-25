@@ -233,9 +233,9 @@ void X3DRFM69::read_and_handle_packet_() {
   this->handle_frame_(buf, len + 1, rssi);
 }
 
-X3DOpening *X3DRFM69::find_opening_(uint32_t device_id) {
+X3DOpening *X3DRFM69::find_opening_(uint32_t x3d_id) {
   for (auto *opening : this->openings_) {
-    if (opening->get_device_id() == device_id)
+    if (opening->get_x3d_id() == x3d_id)
       return opening;
   }
   return nullptr;
@@ -260,22 +260,22 @@ X3DOpening *X3DRFM69::opening_for_(uint32_t x3d_id, EntityBase *entity) {
   return opening;
 }
 
-bool X3DRFM69::first_sighting_(uint32_t device_id) {
+bool X3DRFM69::first_sighting_(uint32_t x3d_id) {
   static constexpr size_t MAX_SIGHTED = 64;
   for (uint32_t id : this->sighted_) {
-    if (id == device_id)
+    if (id == x3d_id)
       return false;
   }
   if (this->sighted_.size() < MAX_SIGHTED)
-    this->sighted_.push_back(device_id);
+    this->sighted_.push_back(x3d_id);
   return true;
 }
 
-void X3DRFM69::check_reversed_id_(uint32_t device_id, const char *id_str) {
+void X3DRFM69::check_reversed_id_(uint32_t x3d_id, const char *id_str) {
   // The ID is little endian on air: raw bytes "85 cc ef" are device 0xEFCC85.
-  const uint32_t reversed = (device_id & 0xFF) << 16 | (device_id & 0xFF00) | (device_id >> 16 & 0xFF);
+  const uint32_t reversed = (x3d_id & 0xFF) << 16 | (x3d_id & 0xFF00) | (x3d_id >> 16 & 0xFF);
   X3DOpening *opening = this->find_opening_(reversed);
-  if (opening != nullptr && reversed != device_id && this->first_sighting_(device_id)) {
+  if (opening != nullptr && reversed != x3d_id && this->first_sighting_(x3d_id)) {
     ESP_LOGW(TAG, "'%s' is configured with x3d_id 0x%06" PRIX32 ", the raw byte order of device 0x%s. Use "
              "'x3d_id: 0x%s'", opening->get_name(), reversed, id_str, id_str);
   }
@@ -384,7 +384,7 @@ void X3DRFM69::dump_config() {
                 "  Frequency: %" PRIu32 " Hz\n"
                 "  Log unclaimed devices: %s\n"
                 "  Restore state: %s\n"
-                "  Openings: %u",
+                "  Claimed devices: %u",
                 this->frequency_, YESNO(this->log_unclaimed_devices_), YESNO(this->restore_state_),
                 static_cast<unsigned>(this->openings_.size()));
   if (this->is_failed())
