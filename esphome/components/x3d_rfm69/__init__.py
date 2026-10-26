@@ -15,6 +15,7 @@ DOMAIN = "x3d_rfm69"
 
 CONF_X3D_RFM69_ID = "x3d_rfm69_id"
 CONF_X3D_ID = "x3d_id"
+CONF_ENABLED = "enabled"
 CONF_DIO0_PIN = "dio0_pin"
 CONF_LOG_UNCLAIMED_DEVICES = "log_unclaimed_devices"
 CONF_RESTORE_STATE = "restore_state"
@@ -45,6 +46,9 @@ X3D_ENTITY_SCHEMA = cv.Schema(
     {
         cv.GenerateID(CONF_X3D_RFM69_ID): cv.use_id(X3DRFM69),
         cv.Required(CONF_X3D_ID): x3d_id,
+        # false: the entity is not created. Lets the profiles turn optional
+        # entities on and off with a var, without conditional includes.
+        cv.Optional(CONF_ENABLED, default=True): cv.boolean,
     }
 )
 
@@ -61,10 +65,14 @@ def unique_entity_final_validate(domain, default_type):
         )
 
     def validator(config):
+        if not config.get(CONF_ENABLED, True):
+            return config
         same = [
             conf
             for conf in fv.full_config.get().get(domain, [])
-            if conf.get(CONF_PLATFORM) == DOMAIN and key(conf) == key(config)
+            if conf.get(CONF_PLATFORM) == DOMAIN
+            and conf.get(CONF_ENABLED, True)
+            and key(conf) == key(config)
         ]
         if len(same) > 1:
             owner = (

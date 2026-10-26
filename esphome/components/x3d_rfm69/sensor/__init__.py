@@ -10,6 +10,7 @@ from esphome.const import (
 )
 
 from .. import (
+    CONF_ENABLED,
     CONF_X3D_ID,
     CONF_X3D_RFM69_ID,
     X3D_ENTITY_SCHEMA,
@@ -31,6 +32,8 @@ FINAL_VALIDATE_SCHEMA = unique_entity_final_validate("sensor", "rssi")
 
 
 async def to_code(config):
+    if not config.get(CONF_ENABLED, True):
+        return
     hub = await cg.get_variable(config[CONF_X3D_RFM69_ID])
     sens = await sensor.new_sensor(config)
     cg.add(hub.add_rssi_sensor(config[CONF_X3D_ID], sens))

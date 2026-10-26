@@ -1,8 +1,8 @@
 # Window with two sashes ("deux vantaux"), one DVI per sash.
 # Creates an HA device "${name}" with "Left lock", "Right lock" and a combined
-# "Lock": unlocked as soon as one sash is, locked when both are.
-# Entity ids: ${id}_left_lock, ${id}_right_lock, ${id}_lock, and
-# ${id}_left_rssi... / ${id}_left_state... when enabled.
+# "Lock": unlocked as soon as one sash is, locked when both are, else unknown.
+# Entity ids: ${id}_left_lock, ${id}_right_lock, ${id}_lock,
+# ${id}_left_rssi, ${id}_right_rssi, ${id}_left_state, ${id}_right_state.
 #
 # vars:
 #   id:           unique id, used for the HA device and the entity ids
@@ -11,6 +11,9 @@
 #   right_x3d_id: radio ID of the right sash
 #   rssi:         true to add "Left RSSI" / "Right RSSI" (default false)
 #   state:        true to add "Left state" / "Right state" (default false)
+#
+# Optional entities are always listed and switched with "enabled", so the
+# profile works without conditional includes (older ESPHome releases).
 substitutions:
   rssi: "false"
   state: "false"
@@ -20,27 +23,19 @@ esphome:
     - id: ${id}
       name: ${name}
 
-packages:
-  left: !include
-    file: parts/sash.yaml
-    vars:
-      sash: ${id}_left
-      label: Left
-      x3d_id: ${left_x3d_id}
-      device: ${id}
-      rssi: ${rssi}
-      state: ${state}
-  right: !include
-    file: parts/sash.yaml
-    vars:
-      sash: ${id}_right
-      label: Right
-      x3d_id: ${right_x3d_id}
-      device: ${id}
-      rssi: ${rssi}
-      state: ${state}
-
 binary_sensor:
+  - platform: x3d_rfm69
+    id: ${id}_left_lock
+    x3d_id: ${left_x3d_id}
+    type: lock
+    name: "Left lock"
+    device_id: ${id}
+  - platform: x3d_rfm69
+    id: ${id}_right_lock
+    x3d_id: ${right_x3d_id}
+    type: lock
+    name: "Right lock"
+    device_id: ${id}
   - platform: template
     id: ${id}_lock
     name: Lock
@@ -53,3 +48,33 @@ binary_sensor:
       if (id(${id}_left_lock).has_state() && id(${id}_right_lock).has_state())
         return false;
       return {};
+
+sensor:
+  - platform: x3d_rfm69
+    id: ${id}_left_rssi
+    x3d_id: ${left_x3d_id}
+    name: "Left RSSI"
+    device_id: ${id}
+    enabled: ${rssi}
+  - platform: x3d_rfm69
+    id: ${id}_right_rssi
+    x3d_id: ${right_x3d_id}
+    name: "Right RSSI"
+    device_id: ${id}
+    enabled: ${rssi}
+
+text_sensor:
+  - platform: x3d_rfm69
+    id: ${id}_left_state
+    x3d_id: ${left_x3d_id}
+    type: state
+    name: "Left state"
+    device_id: ${id}
+    enabled: ${state}
+  - platform: x3d_rfm69
+    id: ${id}_right_state
+    x3d_id: ${right_x3d_id}
+    type: state
+    name: "Right state"
+    device_id: ${id}
+    enabled: ${state}

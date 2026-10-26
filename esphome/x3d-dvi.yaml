@@ -51,11 +51,11 @@ x3d_rfm69:
   # Publish the last saved handle position at boot (entities not "unknown").
   restore_state: true
 
-# One include per window or door. Profiles: window, door, sliding_door,
-# tilt_window, double_window, double_sliding_door (esphome/profiles/).
-# Optional vars: rssi: true, state: true.
+# One package with the profiles from GitHub, one file entry per window or
+# door. Profiles: window, door, sliding_door, tilt_window, double_window,
+# double_sliding_door (esphome/profiles/). Optional vars: rssi, state.
 packages:
-  bathroom_window:
+  x3d_openings:
     url: https://github.com/netixx/x3d-rfm-esp32
     ref: esphome-x3d-dvi
     files:
@@ -64,10 +64,6 @@ packages:
           id: bathroom_window
           name: "Bathroom window"
           x3d_id: "0xEFCC85"
-  living_room_door:
-    url: https://github.com/netixx/x3d-rfm-esp32
-    ref: esphome-x3d-dvi
-    files:
       - path: esphome/profiles/double_sliding_door.yaml
         vars:
           id: living_room_door

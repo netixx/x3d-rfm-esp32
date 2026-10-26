@@ -7,6 +7,7 @@ from esphome.components import text_sensor
 from esphome.const import CONF_TYPE, ENTITY_CATEGORY_DIAGNOSTIC
 
 from .. import (
+    CONF_ENABLED,
     CONF_X3D_ID,
     CONF_X3D_RFM69_ID,
     X3D_ENTITY_SCHEMA,
@@ -38,6 +39,8 @@ FINAL_VALIDATE_SCHEMA = unique_entity_final_validate("text_sensor", TYPE_STATE)
 
 
 async def to_code(config):
+    if not config.get(CONF_ENABLED, True):
+        return
     hub = await cg.get_variable(config[CONF_X3D_RFM69_ID])
     sens = await text_sensor.new_text_sensor(config)
     if config[CONF_TYPE] == TYPE_LAST_FRAME:

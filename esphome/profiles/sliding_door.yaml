@@ -1,6 +1,6 @@
 # Sliding door or window with one sliding sash and one DVI.
-# Creates an HA device "${name}" with a "Lock" entity (shown as Locked / Unlocked).
-# Entity ids: ${id}_lock, and ${id}_rssi / ${id}_state when enabled.
+# Creates an HA device "${name}" with "Lock" ("Lock" is shown as
+# Locked / Unlocked). Entity ids: ${id}_lock, ${id}_rssi, ${id}_state.
 #
 # vars:
 #   id:     unique id, used for the HA device and the entity ids
@@ -8,6 +8,9 @@
 #   x3d_id: radio ID, as printed in the logs ("0xEFCC85")
 #   rssi:   true to add an "RSSI" sensor (default false)
 #   state:  true to add a "State" text sensor, locked / unlocked (default false)
+#
+# Optional entities are always listed and switched with "enabled", so the
+# profile works without conditional includes (older ESPHome releases).
 substitutions:
   rssi: "false"
   state: "false"
@@ -17,14 +20,27 @@ esphome:
     - id: ${id}
       name: ${name}
 
-packages:
-  sash: !include
-    file: parts/sash.yaml
-    vars:
-      sash: ${id}
-      label: ""
-      x3d_id: ${x3d_id}
-      device: ${id}
-      tilt: "false"
-      rssi: ${rssi}
-      state: ${state}
+binary_sensor:
+  - platform: x3d_rfm69
+    id: ${id}_lock
+    x3d_id: ${x3d_id}
+    type: lock
+    name: "Lock"
+    device_id: ${id}
+
+sensor:
+  - platform: x3d_rfm69
+    id: ${id}_rssi
+    x3d_id: ${x3d_id}
+    name: "RSSI"
+    device_id: ${id}
+    enabled: ${rssi}
+
+text_sensor:
+  - platform: x3d_rfm69
+    id: ${id}_state
+    x3d_id: ${x3d_id}
+    type: state
+    name: "State"
+    device_id: ${id}
+    enabled: ${state}

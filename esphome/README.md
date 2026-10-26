@@ -52,21 +52,20 @@ esphome run x3d-dvi.yaml
 
 On NixOS, `nix-shell -p esphome --run "esphome run x3d-dvi.yaml"` is enough.
 
-Tested with ESPHome 2026.10. The profiles use conditional `!include`, which
-older releases don't have. ESPHome caches GitHub sources for a day: add
-`refresh: 0s` to the `external_components` source and to each package to pick
-up changes right away.
+Tested with ESPHome 2026.9 and 2026.10. ESPHome caches GitHub sources for a
+day: add `refresh: 0s` to the `external_components` source and to the package
+to pick up changes right away.
 
 ## Declaring windows and doors
 
-Each window or door is one include of a **profile** package from
-[`profiles/`](profiles/), straight from GitHub. Pick the profile matching the
-opening and give it an `id`, a `name` and its radio ID (see
-[Finding device IDs](#finding-device-ids)):
+Each window or door is one **profile** from [`profiles/`](profiles/), loaded
+straight from GitHub. One package lists them all, so the URL appears once: add
+one `files` entry per window or door, with the profile matching it, an `id`, a
+`name` and its radio ID (see [Finding device IDs](#finding-device-ids)):
 
 ```yaml
 packages:
-  bathroom_window:
+  x3d_openings:
     url: https://github.com/netixx/x3d-rfm-esp32
     ref: esphome-x3d-dvi
     files:
@@ -75,6 +74,13 @@ packages:
           id: bathroom_window
           name: "Bathroom window"
           x3d_id: "0xEFCC85"
+      - path: esphome/profiles/double_sliding_door.yaml
+        vars:
+          id: living_room_door
+          name: "Living room door"
+          left_x3d_id: "0xEFA00B"
+          right_x3d_id: "0xEFACF4"
+          rssi: true
 ```
 
 Each opening becomes its own device in Home Assistant (an ESPHome
@@ -138,7 +144,10 @@ sensor:
     name: "Bathroom window RSSI"
 ```
 
-Each X3D device can have at most one entity of each type.
+Each X3D device can have at most one entity of each type. Every entity also
+takes `enabled: false`, which leaves it out of the firmware; the profiles use
+it for their optional entities (`enabled: ${rssi}`), as conditional includes
+need ESPHome 2026.10.
 
 `x3d_id` accepts `0xEFCC85` (as printed in the logs) or the quoted hex string
 `"EFCC85"`. Don't write an all-digit ID without `0x` or quotes: YAML reads

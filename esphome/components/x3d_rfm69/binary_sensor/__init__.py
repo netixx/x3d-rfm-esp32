@@ -6,6 +6,7 @@ from esphome.components import binary_sensor
 from esphome.const import CONF_TYPE, DEVICE_CLASS_LOCK
 
 from .. import (
+    CONF_ENABLED,
     CONF_X3D_ID,
     CONF_X3D_RFM69_ID,
     X3D_ENTITY_SCHEMA,
@@ -35,6 +36,8 @@ FINAL_VALIDATE_SCHEMA = unique_entity_final_validate("binary_sensor", TYPE_LOCK)
 
 
 async def to_code(config):
+    if not config.get(CONF_ENABLED, True):
+        return
     hub = await cg.get_variable(config[CONF_X3D_RFM69_ID])
     sens = await binary_sensor.new_binary_sensor(config)
     if config[CONF_TYPE] == TYPE_LOCK:
