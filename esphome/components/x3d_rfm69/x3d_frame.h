@@ -15,6 +15,9 @@ static constexpr size_t X3D_MAX_FRAME_LEN = 65;  // length byte + 64 byte payloa
 // handle: it reports locked / unlocked, not open / closed.
 static constexpr uint8_t DVI_STATE_UNLOCKED_BIT = 0x40;
 static constexpr uint8_t DVI_STATE_VALID_BIT = 0x01;
+// State byte 0x80: wake-up / announce frame (16-byte header, flags 0x00), seen
+// when a DVI is activated with a magnet. Carries no handle position.
+static constexpr uint8_t DVI_STATE_ANNOUNCE_BIT = 0x80;
 // Flags byte (idx 8) when unlocked: 0x08 on a tilt-only (soufflet) window,
 // 0x04 on a sliding door. Read as Tydom's OPEN_HOPPER (tilt) vs UNLOCKED.
 // Not yet checked on a tilt-and-turn window.
@@ -24,7 +27,13 @@ enum class HandleState : uint8_t {
   UNCHANGED = 0,  // "state not changed" message (state byte 0x00), maybe a heartbeat
   LOCKED,
   UNLOCKED,
+  ANNOUNCE,  // wake-up / announce frame (state byte 0x80), no handle position
 };
+
+/// LOCKED or UNLOCKED: the frame says where the handle is.
+inline bool has_handle_position(HandleState state) {
+  return state == HandleState::LOCKED || state == HandleState::UNLOCKED;
+}
 
 enum class ParseResult : uint8_t {
   OK = 0,
@@ -78,7 +87,8 @@ const char *handle_state_to_string(HandleState state);
 bool is_tilted(const SensorFrame &frame);
 
 /// Sensor kind from byte 12: 0x20 on a tilt (soufflet) window, 0x40 on a
-/// sliding door. Same split as Tydom's windowFrench / windowSliding.
+/// sliding door, 0x50 on a door. Same split as Tydom's windowFrench /
+/// windowSliding / door device types.
 const char *sensor_kind_to_string(const SensorFrame &frame);
 const char *parse_result_to_string(ParseResult result);
 

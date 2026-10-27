@@ -19,7 +19,7 @@ static constexpr uint8_t HEADER_LEN_MASK = 0x1f;
 // device id (3) + flags + state + checksum (2)
 static constexpr uint8_t MIN_HEADER_LEN = 1 + 3 + 1 + 1 + 2;
 
-// Bytes 10-14 seen so far, byte 12 is the sensor kind (0x20 window / 0x40 sliding).
+// Bytes 10-14 seen so far, byte 12 is the sensor kind (0x20 window / 0x40 sliding / 0x50 door).
 static const uint8_t KNOWN_EXTRA[][5] = {
     {0x82, 0x00, 0x20, 0x00, 0x00},
     {0x82, 0x00, 0x40, 0x00, 0x00},
@@ -96,6 +96,8 @@ ParseResult parse_sensor_frame(const uint8_t *buf, size_t buf_len, SensorFrame *
 }
 
 HandleState decode_handle_state(uint8_t state_byte) {
+  if (state_byte & DVI_STATE_ANNOUNCE_BIT)
+    return HandleState::ANNOUNCE;
   if (state_byte & DVI_STATE_UNLOCKED_BIT)
     return HandleState::UNLOCKED;
   if (state_byte & DVI_STATE_VALID_BIT)
@@ -109,6 +111,8 @@ const char *handle_state_to_string(HandleState state) {
       return "locked";
     case HandleState::UNLOCKED:
       return "unlocked";
+    case HandleState::ANNOUNCE:
+      return "announce";
     default:
       return "unchanged";
   }
@@ -124,6 +128,8 @@ const char *sensor_kind_to_string(const SensorFrame &frame) {
       return "window";
     if (frame.extra[2] == 0x40)
       return "sliding";
+    if (frame.extra[2] == 0x50)
+      return "door";
   }
   return "other";
 }
@@ -165,6 +171,9 @@ const char *parse_result_to_string(ParseResult result) {
 }
 
 bool has_unexpected_bits(const SensorFrame &frame) {
+  // Announce frames have their own, longer layout; not decoded yet.
+  if (frame.state == HandleState::ANNOUNCE)
+    return false;
   if (frame.flags != 0x00 && frame.flags != 0x04 && frame.flags != 0x08)
     return true;
   if (frame.state_byte != 0x00 && frame.state_byte != DVI_STATE_VALID_BIT &&

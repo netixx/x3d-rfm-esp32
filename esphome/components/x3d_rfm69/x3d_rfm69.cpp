@@ -271,6 +271,21 @@ bool X3DRFM69::first_sighting_(uint32_t x3d_id) {
   return true;
 }
 
+bool X3DRFM69::first_unexpected_(const SensorFrame &frame) {
+  static constexpr size_t MAX_WARNED = 64;
+  // One warning per device and content of bytes 8-14.
+  uint32_t key = fnv1_hash_extend(fnv1_hash_extend(frame.device_id, frame.flags), frame.state_byte);
+  for (uint8_t i = 0; i < frame.extra_len; i++)
+    key = fnv1_hash_extend(key, frame.extra[i]);
+  for (uint32_t warned : this->warned_) {
+    if (warned == key)
+      return false;
+  }
+  if (this->warned_.size() < MAX_WARNED)
+    this->warned_.push_back(key);
+  return true;
+}
+
 void X3DRFM69::check_reversed_id_(uint32_t x3d_id, const char *id_str) {
   // The ID is little endian on air: raw bytes "85 cc ef" are device 0xEFCC85.
   const uint32_t reversed = (x3d_id & 0xFF) << 16 | (x3d_id & 0xFF00) | (x3d_id >> 16 & 0xFF);
@@ -333,7 +348,12 @@ void X3DRFM69::handle_frame_(const uint8_t *buf, size_t len, float rssi) {
 
   const char *state_str = handle_state_to_string(frame.state);
   // For logs and last_frame only: the tilt position is shown next to the state.
-  const char *shown_str = is_tilted(frame) ? "unlocked (tilt)" : state_str;
+  const char *shown_str = state_str;
+  if (is_tilted(frame)) {
+    shown_str = "unlocked (tilt)";
+  } else if (frame.state == HandleState::ANNOUNCE) {
+    shown_str = "announce (wake-up frame, no handle position)";
+  }
   const char *kind_str = sensor_kind_to_string(frame);
 
   if (opening == nullptr) {
@@ -352,9 +372,13 @@ void X3DRFM69::handle_frame_(const uint8_t *buf, size_t len, float rssi) {
   ESP_LOGV(TAG, "0x%s: bytes 8-9: %02X %02X, raw %s", id_str, frame.flags, frame.state_byte, raw.c_str());
 
   if (has_unexpected_bits(frame)) {
-    const bool named = opening != nullptr;
-    ESP_LOGW(TAG, "Device 0x%s%s%s%s: unexpected bits in bytes 8-14, please report. raw: %s", id_str, named ? " '" : "",
-             named ? opening->get_name() : "", named ? "'" : "", raw.c_str());
+    if (this->first_unexpected_(frame)) {
+      const bool named = opening != nullptr;
+      ESP_LOGW(TAG, "Device 0x%s%s%s%s: unexpected bits in bytes 8-14, please report. raw: %s", id_str,
+               named ? " '" : "", named ? opening->get_name() : "", named ? "'" : "", raw.c_str());
+    } else {
+      ESP_LOGD(TAG, "0x%s: unexpected bits in bytes 8-14 (already reported)", id_str);
+    }
   }
 
   if (opening != nullptr)

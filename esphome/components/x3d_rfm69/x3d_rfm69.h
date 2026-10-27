@@ -53,7 +53,7 @@ class X3DOpening {
 
   /// Handle event (sensor message).
   void publish(const SensorFrame &frame, float rssi) {
-    if (frame.state != HandleState::UNCHANGED) {
+    if (has_handle_position(frame.state)) {
       const bool tilted = is_tilted(frame);
       this->publish_handle_(frame.state, tilted);
       const uint8_t saved =
@@ -152,6 +152,8 @@ class X3DRFM69 : public Component,
   X3DOpening *opening_for_(uint32_t x3d_id, EntityBase *entity);
   /// True the first time an unclaimed device is seen since boot.
   bool first_sighting_(uint32_t x3d_id);
+  /// True the first time a device sends these unexpected bytes 8-14 since boot.
+  bool first_unexpected_(const SensorFrame &frame);
   /// Warn once if an opening was configured with the ID in raw (byte-reversed) order.
   void check_reversed_id_(uint32_t x3d_id, const char *id_str);
 
@@ -166,6 +168,7 @@ class X3DRFM69 : public Component,
   Deduplicator dedup_;
   std::vector<X3DOpening *> openings_;
   std::vector<uint32_t> sighted_;
+  std::vector<uint32_t> warned_;
   text_sensor::TextSensor *last_frame_{nullptr};
   Trigger<std::string, std::string, bool, std::string, float, std::string> event_trigger_;
 };

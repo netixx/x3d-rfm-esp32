@@ -183,7 +183,9 @@ byte order, a warning tells you which value to use.
 ## Finding device IDs
 
 Flash with `log_unclaimed_devices: true` (the default), then turn each handle
-one opening at a time. Devices without entities (*unclaimed*) are logged at
+one opening at a time. A DVI that stays silent can be woken up by passing a
+strong magnet in front of it a few times (see
+[Decoding notes](#decoding-notes)). Devices without entities (*unclaimed*) are logged at
 INFO, so they stand out: every handle event, and the first message of any
 other type (thermostats, Tydom box, ...):
 
@@ -287,26 +289,45 @@ x3d_rfm69:
   payload, stored big endian.
 - Header checksum: `0x10000 - sum(device id .. byte before checksum)`, big
   endian, checked as well.
-- Frame bytes 8-14, from captures of a tilt (soufflet) window and a sliding
-  door:
+- Frame bytes 8-14, from captures of a tilt (soufflet) window, a sliding door
+  and a door:
 
   | Device            | Locked                 | Unlocked               |
   |-------------------|------------------------|------------------------|
   | Tilt window       | `00 01 82 00 20 00 00` | `08 41 82 00 20 00 00` |
   | Sliding door      | `00 01 82 00 40 00 00` | `04 41 82 00 40 00 00` |
+  | Door              | not captured yet       | `05 41 82 00 50 00 04` |
 
   State comes from byte 9: bit `0x40` = unlocked, `0x01` = locked, `0x00` =
   "not changed" (entities keep their value). Byte 8 bit `0x08` is read as the
   tilt position (Tydom's `OPEN_HOPPER`), `0x04` as a plain unlock. Byte 12 gives
-  the `kind`: `0x20` window, `0x40` sliding, matching Tydom's `windowFrench` /
-  `windowSliding` device types.
+  the `kind`: `0x20` window, `0x40` sliding, `0x50` door, matching Tydom's
+  `windowFrench` / `windowSliding` / door device types. On the door, byte 8 bit
+  `0x01` and byte 14 `0x04` are not understood yet (see the activation notes
+  below, they may be a test mode).
 - Not captured yet: a tilt-and-turn window with the handle horizontal (turn
   position, Tydom's `OPEN_FRENCH`). If it also sets `0x08`, the tilt sensor
   would be wrong on those windows. Captures welcome.
 - Each event is sent 3 times ~20 ms apart, then the same burst again
   ~3.5-5.3 s later. Both are dropped by message number for 30 s.
 - Values in bytes 8-14 that don't match the table (possibly battery low or
-  tamper) are logged at WARN level with the raw frame. Please report them.
+  tamper) are logged at WARN level with the raw frame, once per device and
+  pattern (repeats at DEBUG). Please report them.
+- **Activation and announce frames** (observed, not documented anywhere we
+  found: the repo's [X3D-Protocol.md](../X3D-Protocol.md) only covers Tydom
+  pairing messages, and Delta Dore / K•LINE describe pairing through the Tydom
+  app). Passing a strong magnet in front of a DVI a few times wakes it up:
+  - it sends an **announce** frame: a sensor message with a 16-byte header,
+    flags `0x00` (no "no response required" bit, so it probably expects an
+    answer, e.g. from a Tydom in pairing mode) and state byte `0x80`:
+    ```
+    16 ff 00 00 10 02 a0 ef 00 80 82 01 01 40 00 00 1e 3f fc ce 24 e5
+    ```
+    It is logged as `announce` and never changes the entities.
+  - a door sent its state about once per second, with a new message number
+    each time, for at least 10 s (instead of the usual 3 + 3 repeats).
+
+  Raw captures: [`tests/unsupported_frames.txt`](tests/unsupported_frames.txt).
 
 ## Tests
 

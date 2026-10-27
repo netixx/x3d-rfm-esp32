@@ -42,6 +42,26 @@ Cyclic with its administrative device id:
 13 FF ** 00 2D ****** 00 00 8201000000 qqqq   Contact not changed
 ```
 
+## Type 0 messages send from K•LINE DVI (lock detector)
+
+Byte 8 flags, byte 9 state, byte 12 kind (`20` window, `40` sliding, `50` door):
+```
+13 FF ** 00 2D ****** 00 01 8200200000 cccc qqqq   Window, locked
+13 FF ** 00 2D ****** 08 41 8200200000 cccc qqqq   Window, unlocked (tilt)
+13 FF ** 00 2D ****** 00 01 8200400000 cccc qqqq   Sliding door, locked
+13 FF ** 00 2D ****** 04 41 8200400000 cccc qqqq   Sliding door, unlocked
+13 FF ** 00 2D ****** 05 41 8200500004 cccc qqqq   Door, unlocked (sent ~1/s after magnet activation)
+13 FF ** 00 2D ****** 00 00 8200400000 cccc qqqq   Not changed
+```
+
+Announce frame, sent when a DVI is woken up by passing a magnet in front of it
+(16 byte header, flags `0x00`):
+```
+16 FF 00 00 10 ****** 00 80 8201014000001E3F cccc qqqq
+```
+
+`cccc` header checksum, `qqqq` CRC. Decoder: [esphome/](esphome/README.md).
+
 ## Type 1 messages send from Tydom 1.0
 
 Unpair device No. 3 (0b1000)

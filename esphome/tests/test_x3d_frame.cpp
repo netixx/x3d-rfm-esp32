@@ -200,6 +200,34 @@ static void test_msb_misread_frame() {
   CHECK(std::strcmp(sensor_kind_to_string(f), "sliding") == 0);
 }
 
+// Field report (esphome/tests/unsupported_frames.txt): door 0xEFA214, about
+// one frame per second after activation with a magnet.
+static void test_door_frame() {
+  static const uint8_t DOOR[] = {0x13, 0xff, 0x1a, 0x00, 0x2d, 0x14, 0xa2, 0xef, 0x05, 0x41,
+                                 0x82, 0x00, 0x50, 0x00, 0x04, 0xfd, 0x3f, 0xd3, 0xe3};
+  SensorFrame f{};
+  CHECK(parse_sensor_frame(DOOR, sizeof(DOOR), &f) == ParseResult::OK);
+  CHECK(f.device_id == 0xEFA214);
+  CHECK(f.state == HandleState::UNLOCKED);
+  CHECK(!is_tilted(f));
+  CHECK(std::strcmp(sensor_kind_to_string(f), "door") == 0);
+  CHECK(has_unexpected_bits(f));  // flags 0x05 and byte 14 = 0x04 not understood yet
+}
+
+// Wake-up / announce frame: 16-byte header, flags 0x00, state byte 0x80.
+static void test_announce_frame() {
+  static const uint8_t ANNOUNCE[] = {0x16, 0xff, 0x00, 0x00, 0x10, 0x02, 0xa0, 0xef, 0x00, 0x80, 0x82,
+                                     0x01, 0x01, 0x40, 0x00, 0x00, 0x1e, 0x3f, 0xfc, 0xce, 0x24, 0xe5};
+  SensorFrame f{};
+  CHECK(parse_sensor_frame(ANNOUNCE, sizeof(ANNOUNCE), &f) == ParseResult::OK);
+  CHECK(f.device_id == 0xEFA002);
+  CHECK(f.state == HandleState::ANNOUNCE);
+  CHECK(!has_handle_position(f.state));
+  CHECK(!is_tilted(f));
+  CHECK(!has_unexpected_bits(f));
+  CHECK(std::strcmp(handle_state_to_string(f.state), "announce") == 0);
+}
+
 static void test_decode_state() {
   CHECK(decode_handle_state(0x41) == HandleState::UNLOCKED);
   CHECK(decode_handle_state(0x01) == HandleState::LOCKED);
@@ -267,6 +295,8 @@ int main() {
   test_corruption();
   test_parse_any_frame();
   test_msb_misread_frame();
+  test_door_frame();
+  test_announce_frame();
   test_decode_state();
   test_replay_capture();
   test_dedup();
