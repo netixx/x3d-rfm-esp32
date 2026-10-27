@@ -3,7 +3,8 @@
 # "Lock": unlocked as soon as one sash is, locked when both are, else unknown.
 # Entity ids: ${id}_left_lock, ${id}_right_lock, ${id}_lock,
 # ${id}_left_rssi, ${id}_right_rssi, ${id}_left_state, ${id}_right_state,
-# ${id}_left_handle, ${id}_right_handle.
+# ${id}_left_handle, ${id}_right_handle, ${id}_left_connectivity,
+# ${id}_right_connectivity.
 #
 # vars:
 #   id:           unique id, used for the HA device and the entity ids
@@ -15,6 +16,9 @@
 #   lock_entity:  true to add read-only "Left handle" / "Right handle" lock
 #                 entities (default false), see the README: workaround so the
 #                 sashes show in the Security section of HA's area dashboard
+#   connectivity: true to add "Left connectivity" / "Right connectivity"
+#                 (default false), OFF when a sash sent nothing for the hub
+#                 `timeout` (battery dead?)
 #
 # Optional entities are always listed and switched with "enabled", so the
 # profile works without conditional includes (older ESPHome releases).
@@ -22,6 +26,7 @@ substitutions:
   rssi: "false"
   state: "false"
   lock_entity: "false"
+  connectivity: "false"
 
 esphome:
   devices:
@@ -41,6 +46,20 @@ binary_sensor:
     type: lock
     name: "Right lock"
     device_id: ${id}
+  - platform: x3d_rfm69
+    id: ${id}_left_connectivity
+    x3d_id: ${left_x3d_id}
+    type: connectivity
+    name: "Left connectivity"
+    device_id: ${id}
+    enabled: ${connectivity}
+  - platform: x3d_rfm69
+    id: ${id}_right_connectivity
+    x3d_id: ${right_x3d_id}
+    type: connectivity
+    name: "Right connectivity"
+    device_id: ${id}
+    enabled: ${connectivity}
   - platform: template
     id: ${id}_lock
     name: Lock

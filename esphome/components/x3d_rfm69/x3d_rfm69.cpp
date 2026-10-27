@@ -136,6 +136,23 @@ void X3DRFM69::setup() {
       opening->restore_state();
   }
 
+  // Battery-powered DVIs go silent when their battery dies: clear the entities
+  // of a device that sent nothing for `timeout` (counted from boot at first).
+  if (this->timeout_ms_ > 0) {
+    const uint32_t now = millis();
+    for (auto *opening : this->openings_)
+      opening->reset_last_seen(now);
+    this->set_interval(10000, [this]() {
+      const uint32_t now = millis();
+      for (auto *opening : this->openings_) {
+        if (opening->check_timeout(now, this->timeout_ms_)) {
+          ESP_LOGW(TAG, "'%s' (0x%06" PRIX32 "): no frame for %" PRIu32 " min, entities set to unknown. Battery?",
+                   opening->get_name(), opening->get_x3d_id(), (now - opening->get_last_seen_ms()) / 60000);
+        }
+      }
+    });
+  }
+
   // Safety net: if a DIO0 edge was missed the pin stays high and no new edge comes.
   if (this->dio0_pin_ != nullptr) {
     this->set_interval(1000, [this]() {
@@ -408,9 +425,10 @@ void X3DRFM69::dump_config() {
                 "  Frequency: %" PRIu32 " Hz\n"
                 "  Log unclaimed devices: %s\n"
                 "  Restore state: %s\n"
+                "  Timeout: %" PRIu32 " s\n"
                 "  Claimed devices: %u",
                 this->frequency_, YESNO(this->log_unclaimed_devices_), YESNO(this->restore_state_),
-                static_cast<unsigned>(this->openings_.size()));
+                this->timeout_ms_ / 1000, static_cast<unsigned>(this->openings_.size()));
   if (this->is_failed())
     ESP_LOGE(TAG, "  Radio initialisation failed, see earlier log");
 }

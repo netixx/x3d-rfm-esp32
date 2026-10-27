@@ -107,6 +107,7 @@ Optional vars, on every profile:
 |---------|----------------------------------------------------|
 | `rssi: true`  | `RSSI` sensor in dBm, updated on every frame: acts as "last seen" |
 | `state: true` | `State` text sensor: `locked` / `unlocked`  |
+| `connectivity: true` | `Connectivity` binary sensor: OFF when the DVI sent nothing for the hub `timeout` (needs `timeout`, see [Silent sensors](#silent-sensors-and-dead-batteries)) |
 | `lock_entity: true` | read-only `Handle` lock entity (`Left handle` / `Right handle`), a workaround, see [below](#workaround-security-section-of-the-area-dashboard) |
 
 Entity ids are `<id>_lock`, `<id>_tilted`, `<id>_rssi`, `<id>_state`, and
@@ -252,6 +253,36 @@ usually one the firmware no longer provides, for example after renaming an
 opening or changing its profile. Remove it from Home Assistant
 (*Settings → Entities*).
 
+## Silent sensors and dead batteries
+
+DVIs run on batteries. When a battery dies the sensor just stops sending, and
+its entities would keep their last state forever. With a hub `timeout`, a
+claimed device that sent no frame at all for that long gets its entities
+cleared (*unknown* in Home Assistant: ESPHome can't make a single entity
+*unavailable*) and a warning is logged:
+
+```
+[W][x3d_rfm69]: 'Bathroom window' (0xEFCC85): no frame for 1560 min, entities set to unknown. Battery?
+```
+
+The next frame of any kind brings it back: a "not changed" heartbeat
+publishes the last known position again. The `connectivity` entity (profile var
+`connectivity: true`, or `type: connectivity`) shows the same as a binary
+sensor you can alert on.
+
+The timeout is **off by default**: how often a DVI sends a heartbeat when
+nothing happens isn't known yet (Tydom shows a `supervisionMode` setting,
+`SHORT` / `LONG`). Measure it first: with `rssi: true`, the RSSI sensor updates
+on every frame, so its history shows the gaps; or watch the `unchanged` lines
+at DEBUG. Then set the timeout to 2-3 times the longest gap:
+
+```yaml
+x3d_rfm69:
+  timeout: 26h
+```
+
+Too short a timeout blanks working sensors between heartbeats.
+
 ## Hub options
 
 ```yaml
@@ -263,6 +294,7 @@ x3d_rfm69:
   data_rate: 1MHz          # default, see Hardware
   log_unclaimed_devices: true
   restore_state: true      # publish the last saved handle position at boot
+  timeout: 0s              # off; clear entities of devices silent this long
   on_opening_event: ...    # automation, see below
 ```
 

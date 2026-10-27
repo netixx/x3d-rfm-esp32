@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cmath>
 #include <string>
 #include <vector>
 
@@ -22,6 +23,8 @@ namespace esphome::x3d_rfm69 {
 class HandleListener {
  public:
   virtual void on_handle(HandleState state, bool tilted) = 0;
+  /// No frame for longer than the timeout: the position is unknown.
+  virtual void on_timeout() {}
 };
 
 /// Entities of one X3D device (one sash of a window or door), grouped by the hub.
@@ -33,6 +36,7 @@ class X3DOpening {
   void set_tilt_sensor(binary_sensor::BinarySensor *sensor) { this->tilt_ = sensor; }
   void set_state_sensor(text_sensor::TextSensor *sensor) { this->state_ = sensor; }
   void set_rssi_sensor(sensor::Sensor *sensor) { this->rssi_ = sensor; }
+  void set_connectivity_sensor(binary_sensor::BinarySensor *sensor) { this->connectivity_ = sensor; }
   void add_handle_listener(HandleListener *listener) { this->listeners_.push_back(listener); }
 
   uint32_t get_x3d_id() const { return this->x3d_id_; }
@@ -53,6 +57,7 @@ class X3DOpening {
 
   /// Handle event (sensor message).
   void publish(const SensorFrame &frame, float rssi) {
+    this->heard_(!has_handle_position(frame.state));
     if (has_handle_position(frame.state)) {
       const bool tilted = is_tilted(frame);
       this->publish_handle_(frame.state, tilted);
@@ -63,21 +68,65 @@ class X3DOpening {
         this->pref_.save(&saved);
       }
     }
-    this->publish_seen(rssi);
+    this->publish_rssi_(rssi);
   }
 
   /// Any valid frame from this device: only the signal strength is known.
   void publish_seen(float rssi) {
-    if (this->rssi_ != nullptr)
-      this->rssi_->publish_state(rssi);
+    this->heard_(true);
+    this->publish_rssi_(rssi);
   }
+
+  /// Called periodically with the hub timeout (0 = off). Returns true when the
+  /// device just went silent: its entities are cleared ("unknown" in HA).
+  bool check_timeout(uint32_t now, uint32_t timeout_ms) {
+    if (timeout_ms == 0 || this->timed_out_ || now - this->last_seen_ms_ < timeout_ms)
+      return false;
+    this->timed_out_ = true;
+    if (this->lock_ != nullptr)
+      this->lock_->invalidate_state();
+    if (this->tilt_ != nullptr)
+      this->tilt_->invalidate_state();
+    if (this->state_ != nullptr)
+      this->state_->publish_state("unknown");
+    if (this->rssi_ != nullptr)
+      this->rssi_->publish_state(NAN);
+    if (this->connectivity_ != nullptr)
+      this->connectivity_->publish_state(false);
+    for (auto *listener : this->listeners_)
+      listener->on_timeout();
+    return true;
+  }
+  uint32_t get_last_seen_ms() const { return this->last_seen_ms_; }
+  /// Start of the timeout window (boot).
+  void reset_last_seen(uint32_t now) { this->last_seen_ms_ = now; }
 
  protected:
   static constexpr uint8_t SAVED_LOCKED = 1;
   static constexpr uint8_t SAVED_UNLOCKED = 2;
   static constexpr uint8_t SAVED_TILTED = 3;
 
+  void publish_rssi_(float rssi) {
+    if (this->rssi_ != nullptr)
+      this->rssi_->publish_state(rssi);
+  }
+
+  /// A frame arrived. After a timeout, publish the last known position again
+  /// (unless the frame brings a new one): the handle hasn't moved since.
+  void heard_(bool republish_last) {
+    this->last_seen_ms_ = millis();
+    if (this->connectivity_ != nullptr)
+      this->connectivity_->publish_state(true);
+    if (this->timed_out_) {
+      this->timed_out_ = false;
+      if (republish_last && has_handle_position(this->last_state_))
+        this->publish_handle_(this->last_state_, this->last_tilted_);
+    }
+  }
+
   void publish_handle_(HandleState state, bool tilted) {
+    this->last_state_ = state;
+    this->last_tilted_ = tilted;
     // Home Assistant lock device class: ON means unlocked.
     if (this->lock_ != nullptr)
       this->lock_->publish_state(state == HandleState::UNLOCKED);
@@ -98,7 +147,12 @@ class X3DOpening {
   binary_sensor::BinarySensor *tilt_{nullptr};
   text_sensor::TextSensor *state_{nullptr};
   sensor::Sensor *rssi_{nullptr};
+  binary_sensor::BinarySensor *connectivity_{nullptr};
   std::vector<HandleListener *> listeners_;
+  uint32_t last_seen_ms_{0};
+  bool timed_out_{false};
+  HandleState last_state_{HandleState::UNCHANGED};
+  bool last_tilted_{false};
 };
 
 class X3DRFM69 : public Component,
@@ -114,6 +168,7 @@ class X3DRFM69 : public Component,
   void set_frequency(uint32_t frequency) { this->frequency_ = frequency; }
   void set_log_unclaimed_devices(bool log) { this->log_unclaimed_devices_ = log; }
   void set_restore_state(bool restore) { this->restore_state_ = restore; }
+  void set_timeout(uint32_t timeout_ms) { this->timeout_ms_ = timeout_ms; }
 
   /// `platform: x3d_rfm69` entities: attached to the opening of their X3D
   /// device, created on first use.
@@ -128,6 +183,9 @@ class X3DRFM69 : public Component,
   }
   void add_rssi_sensor(uint32_t x3d_id, sensor::Sensor *sensor) {
     this->opening_for_(x3d_id, sensor)->set_rssi_sensor(sensor);
+  }
+  void add_connectivity_sensor(uint32_t x3d_id, binary_sensor::BinarySensor *sensor) {
+    this->opening_for_(x3d_id, sensor)->set_connectivity_sensor(sensor);
   }
   void add_handle_listener(uint32_t x3d_id, EntityBase *entity, HandleListener *listener) {
     this->opening_for_(x3d_id, entity)->add_handle_listener(listener);
@@ -163,6 +221,7 @@ class X3DRFM69 : public Component,
   uint32_t frequency_{868950000};
   bool log_unclaimed_devices_{true};
   bool restore_state_{true};
+  uint32_t timeout_ms_{0};
   uint8_t mode_{0xff};
 
   Deduplicator dedup_;

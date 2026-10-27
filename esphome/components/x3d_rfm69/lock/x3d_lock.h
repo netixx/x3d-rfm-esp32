@@ -17,6 +17,7 @@ class X3DLock : public lock::Lock, public HandleListener {
   void on_handle(HandleState state, bool /*tilted*/) override {
     this->publish_state(state == HandleState::LOCKED ? lock::LOCK_STATE_LOCKED : lock::LOCK_STATE_UNLOCKED);
   }
+  void on_timeout() override { this->publish_state(lock::LOCK_STATE_NONE); }
 
  protected:
   void control(const lock::LockCall &/*call*/) override {

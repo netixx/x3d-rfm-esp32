@@ -1,7 +1,7 @@
 # Tilt window (soufflet / tilt-and-turn) with one DVI.
 # Creates an HA device "${name}" with "Lock" and "Tilted" ("Lock" is shown as
 # Locked / Unlocked).
-# Entity ids: ${id}_lock, ${id}_tilted, ${id}_rssi, ${id}_state, ${id}_handle.
+# Entity ids: ${id}_lock, ${id}_tilted, ${id}_rssi, ${id}_state, ${id}_handle, ${id}_connectivity.
 #
 # vars:
 #   id:     unique id, used for the HA device and the entity ids
@@ -12,6 +12,8 @@
 #   lock_entity: true to add a read-only "Handle" lock entity (default false),
 #           see the README: workaround so the opening shows in the Security
 #           section of HA's area dashboard
+#   connectivity: true to add a "Connectivity" sensor (default false), OFF
+#           when the DVI sent nothing for the hub `timeout` (battery dead?)
 #
 # Optional entities are always listed and switched with "enabled", so the
 # profile works without conditional includes (older ESPHome releases).
@@ -19,6 +21,7 @@ substitutions:
   rssi: "false"
   state: "false"
   lock_entity: "false"
+  connectivity: "false"
 
 esphome:
   devices:
@@ -38,6 +41,13 @@ binary_sensor:
     type: tilt
     name: "Tilted"
     device_id: ${id}
+  - platform: x3d_rfm69
+    id: ${id}_connectivity
+    x3d_id: ${x3d_id}
+    type: connectivity
+    name: "Connectivity"
+    device_id: ${id}
+    enabled: ${connectivity}
 
 sensor:
   - platform: x3d_rfm69

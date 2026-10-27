@@ -19,6 +19,7 @@ CONF_ENABLED = "enabled"
 CONF_DIO0_PIN = "dio0_pin"
 CONF_LOG_UNCLAIMED_DEVICES = "log_unclaimed_devices"
 CONF_RESTORE_STATE = "restore_state"
+CONF_TIMEOUT = "timeout"
 CONF_ON_OPENING_EVENT = "on_opening_event"
 
 x3d_rfm69_ns = cg.esphome_ns.namespace("x3d_rfm69")
@@ -99,6 +100,11 @@ CONFIG_SCHEMA = (
             cv.Optional(CONF_LOG_UNCLAIMED_DEVICES, default=True): cv.boolean,
             # Publish the last saved handle position at boot.
             cv.Optional(CONF_RESTORE_STATE, default=True): cv.boolean,
+            # Clear the entities of a claimed device silent for this long
+            # (battery dead). 0s = off. Set it from the measured heartbeat.
+            cv.Optional(
+                CONF_TIMEOUT, default="0s"
+            ): cv.positive_time_period_milliseconds,
             cv.Optional(CONF_ON_OPENING_EVENT): automation.validate_automation(
                 single=True
             ),
@@ -134,6 +140,7 @@ async def to_code(config):
     cg.add(var.set_frequency(int(config[CONF_FREQUENCY])))
     cg.add(var.set_log_unclaimed_devices(config[CONF_LOG_UNCLAIMED_DEVICES]))
     cg.add(var.set_restore_state(config[CONF_RESTORE_STATE]))
+    cg.add(var.set_timeout(config[CONF_TIMEOUT]))
 
     if CONF_ON_OPENING_EVENT in config:
         await automation.build_automation(
