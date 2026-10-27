@@ -1,0 +1,37 @@
+new frames detected from DOOR sensor EFA214 (standard door)
+[13:40:19.341][W][x3d_rfm69:356]: Device 0xEFA214: unexpected bits in bytes 8-14, please report. raw: 13 ff 1a 00 2d 14 a2 ef 05 41 82 00 50 00 04 fd 3f d3 e3
+[13:40:19.434][S][text_sensor]: 'last X3D frame' >> '0xEFA214 unclaimed: unlocked (other, -100.0 dBm)'
+[13:40:20.348][I][x3d_rfm69:342]: Unclaimed device 0xEFA214 (other): unlocked, -96.5 dBm -> claim it with 'x3d_id: 0xEFA214'
+[13:40:20.354][W][x3d_rfm69:356]: Device 0xEFA214: unexpected bits in bytes 8-14, please report. raw: 13 ff 1b 00 2d 14 a2 ef 05 41 82 00 50 00 04 fd 3f 7d 1f
+[13:40:20.446][S][text_sensor]: 'last X3D frame' >> '0xEFA214 unclaimed: unlocked (other, -96.5 dBm)'
+[13:40:21.358][I][x3d_rfm69:342]: Unclaimed device 0xEFA214 (other): unlocked, -102.5 dBm -> claim it with 'x3d_id: 0xEFA214'
+[13:40:21.370][W][x3d_rfm69:356]: Device 0xEFA214: unexpected bits in bytes 8-14, please report. raw: 13 ff 1c 00 2d 14 a2 ef 05 41 82 00 50 00 04 fd 3f 05 88
+[13:40:21.458][S][text_sensor]: 'last X3D frame' >> '0xEFA214 unclaimed: unlocked (other, -102.5 dBm)'
+[13:40:22.368][I][x3d_rfm69:342]: Unclaimed device 0xEFA214 (other): unlocked, -102.5 dBm -> claim it with 'x3d_id: 0xEFA214'
+[13:40:22.374][W][x3d_rfm69:356]: Device 0xEFA214: unexpected bits in bytes 8-14, please report. raw: 13 ff 1d 00 2d 14 a2 ef 05 41 82 00 50 00 04 fd 3f ab 74
+[13:40:22.466][S][text_sensor]: 'last X3D frame' >> '0xEFA214 unclaimed: unlocked (other, -102.5 dBm)'
+[13:40:23.379][I][x3d_rfm69:342]: Unclaimed device 0xEFA214 (other): unlocked, -102.5 dBm -> claim it with 'x3d_id: 0xEFA214'
+[13:40:23.386][W][x3d_rfm69:356]: Device 0xEFA214: unexpected bits in bytes 8-14, please report. raw: 13 ff 1e 00 2d 14 a2 ef 05 41 82 00 50 00 04 fd 3f 48 51
+[13:40:23.477][S][text_sensor]: 'last X3D frame' >> '0xEFA214 unclaimed: unlocked (other, -102.5 dBm)'
+[13:40:24.390][I][x3d_rfm69:342]: Unclaimed device 0xEFA214 (other): unlocked, -99.5 dBm -> claim it with 'x3d_id: 0xEFA214'
+[13:40:24.395][W][x3d_rfm69:356]: Device 0xEFA214: unexpected bits in bytes 8-14, please report. raw: 13 ff 1f 00 2d 14 a2 ef 05 41 82 00 50 00 04 fd 3f e6 ad
+[13:40:24.488][S][text_sensor]: 'last X3D frame' >> '0xEFA214 unclaimed: unlocked (other, -99.5 dBm)'
+[13:40:25.401][I][x3d_rfm69:342]: Unclaimed device 0xEFA214 (other): unlocked, -102.0 dBm -> claim it with 'x3d_id: 0xEFA214'
+[13:40:25.408][W][x3d_rfm69:356]: Device 0xEFA214: unexpected bits in bytes 8-14, please report. raw: 13 ff 20 00 2d 14 a2 ef 05 41 82 00 50 00 04 fd 3f 6a e1
+[13:40:25.500][S][text_sensor]: 'last X3D frame' >> '0xEFA214 unclaimed: unlocked (other, -102.0 dBm)'
+[13:40:26.411][I][x3d_rfm69:342]: Unclaimed device 0xEFA214 (other): unlocked, -98.5 dBm -> claim it with 'x3d_id: 0xEFA214'
+[13:40:26.417][W][x3d_rfm69:356]: Device 0xEFA214: unexpected bits in bytes 8-14, please report. raw: 13 ff 21 00 2d 14 a2 ef 05 41 82 00 50 00 04 fd 3f c4 1d
+[13:40:26.509][S][text_sensor]: 'last X3D frame' >> '0xEFA214 unclaimed: unlocked (other, -98.5 dBm)'
+[13:40:27.422][I][x3d_rfm69:342]: Unclaimed device 0xEFA214 (other): unlocked, -99.5 dBm -> claim it with 'x3d_id: 0xEFA214'
+[13:40:27.428][W][x3d_rfm69:356]: Device 0xEFA214: unexpected bits in bytes 8-14, please report. raw: 13 ff 22 00 2d 14 a2 ef 05 41 82 00 50 00 04 fd 3f 27 38
+[13:40:27.520][S][text_sensor]: 'last X3D frame' >> '0xEFA214 unclaimed: unlocked (other, -99.5 dBm)'
+[13:40:28.435][I][x3d_rfm69:342]: Unclaimed device 0xEFA214 (other): unlocked, -104.5 dBm -> claim it with 'x3d_id: 0xEFA214'
+[13:40:28.439][W][x3d_rfm69:356]: Device 0xEFA214: unexpected bits in bytes 8-14, please report. raw: 13 ff 23 00 2d 14 a2 ef 05 41 82 00 50 00 04 fd 3f 89 c4
+[13:40:28.533][S][text_sensor]: 'last X3D frame' >> '0xEFA214 unclaimed: unlocked (other, -104.5 dBm)'
+[13:40:29.444][I][x3d_rfm69:342]: Unclaimed device 0xEFA214 (other): unlocked, -101.5 dBm -> claim it with 'x3d_id: 0xEFA214'
+[13:40:29.450][W][x3d_rfm69:356]: Device 0xEFA214: unexpected bits in bytes 8-14, please report. raw: 13 ff 24 00 2d 14 a2 ef 05 41 82 00 50 00 04 fd 3f f1 53
+[13:40:29.542][S][text_sensor]: 'last X3D frame' >> '0xEFA214 unclaimed: unlocked (other, -101.5 dBm)'
+
+
+also each sensor seems to emit this when initialised (I needed to use a strong magnet and passed it a couple of time in front of the sensor to get them to output some frames):
+16 ff 00 00 10 02 a0 ef 00 80 82 01 01 40 00 00 1e 3f fc ce 24 e5
