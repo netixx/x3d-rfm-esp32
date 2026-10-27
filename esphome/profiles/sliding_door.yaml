@@ -1,6 +1,7 @@
 # Sliding door or window with one sliding sash and one DVI.
 # Creates an HA device "${name}" with "Lock" ("Lock" is shown as
-# Locked / Unlocked). Entity ids: ${id}_lock, ${id}_rssi, ${id}_state.
+# Locked / Unlocked).
+# Entity ids: ${id}_lock, ${id}_rssi, ${id}_state, ${id}_handle.
 #
 # vars:
 #   id:     unique id, used for the HA device and the entity ids
@@ -8,12 +9,16 @@
 #   x3d_id: radio ID, as printed in the logs ("0xEFCC85")
 #   rssi:   true to add an "RSSI" sensor (default false)
 #   state:  true to add a "State" text sensor, locked / unlocked (default false)
+#   lock_entity: true to add a read-only "Handle" lock entity (default false),
+#           see the README: workaround so the opening shows in the Security
+#           section of HA's area dashboard
 #
 # Optional entities are always listed and switched with "enabled", so the
 # profile works without conditional includes (older ESPHome releases).
 substitutions:
   rssi: "false"
   state: "false"
+  lock_entity: "false"
 
 esphome:
   devices:
@@ -44,3 +49,13 @@ text_sensor:
     name: "State"
     device_id: ${id}
     enabled: ${state}
+
+# Read-only lock entity, off by default (lock_entity: true). Workaround:
+# HA's area dashboard only lists lock entities in its Security section.
+lock:
+  - platform: x3d_rfm69
+    id: ${id}_handle
+    x3d_id: ${x3d_id}
+    name: "Handle"
+    device_id: ${id}
+    enabled: ${lock_entity}

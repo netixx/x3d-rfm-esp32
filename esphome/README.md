@@ -107,6 +107,7 @@ Optional vars, on every profile:
 |---------|----------------------------------------------------|
 | `rssi: true`  | `RSSI` sensor in dBm, updated on every frame: acts as "last seen" |
 | `state: true` | `State` text sensor: `locked` / `unlocked`  |
+| `lock_entity: true` | read-only `Handle` lock entity (`Left handle` / `Right handle`), a workaround, see [below](#workaround-security-section-of-the-area-dashboard) |
 
 Entity ids are `<id>_lock`, `<id>_tilted`, `<id>_rssi`, `<id>_state`, and
 `<id>_left_lock`, `<id>_right_lock`... for the double profiles. Customize any
@@ -119,6 +120,22 @@ binary_sensor:
     filters:
       - delayed_on: 1s
 ```
+
+### Workaround: Security section of the area dashboard
+
+Home Assistant's area (rooms) dashboard only lists `lock`, `alarm_control_panel`
+and `camera` entities in its **Security** section. The `Lock` binary sensor
+(device class `lock`) shows in the global Security dashboard, but not there.
+
+As a workaround, `lock_entity: true` adds a read-only **lock** entity per sash
+(`Handle`), which the area dashboard picks up. It follows the handle like the
+binary sensor. The radio only receives, so the Lock / Unlock buttons Home
+Assistant shows can't work: commands are refused (logged as a warning) and the
+real state is published again. Prefer the binary sensor everywhere else.
+
+The proper fix belongs in Home Assistant's frontend (list `binary_sensor` with
+device class `lock` in the area Security section, as the Security dashboard
+already does).
 
 ### Entities without profiles
 
@@ -142,6 +159,11 @@ sensor:
   - platform: x3d_rfm69
     x3d_id: 0xEFCC85
     name: "Bathroom window RSSI"
+
+lock:                       # read-only workaround, see above
+  - platform: x3d_rfm69
+    x3d_id: 0xEFCC85
+    name: "Bathroom window handle"
 ```
 
 Each X3D device can have at most one entity of each type. Every entity also

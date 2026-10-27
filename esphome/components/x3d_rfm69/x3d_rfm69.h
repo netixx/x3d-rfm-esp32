@@ -17,6 +17,13 @@
 
 namespace esphome::x3d_rfm69 {
 
+/// Gets every handle position of one X3D device, e.g. the read-only lock
+/// entity, which lives in its own platform so the hub doesn't need `lock`.
+class HandleListener {
+ public:
+  virtual void on_handle(HandleState state, bool tilted) = 0;
+};
+
 /// Entities of one X3D device (one sash of a window or door), grouped by the hub.
 class X3DOpening {
  public:
@@ -26,6 +33,7 @@ class X3DOpening {
   void set_tilt_sensor(binary_sensor::BinarySensor *sensor) { this->tilt_ = sensor; }
   void set_state_sensor(text_sensor::TextSensor *sensor) { this->state_ = sensor; }
   void set_rssi_sensor(sensor::Sensor *sensor) { this->rssi_ = sensor; }
+  void add_handle_listener(HandleListener *listener) { this->listeners_.push_back(listener); }
 
   uint32_t get_x3d_id() const { return this->x3d_id_; }
   const char *get_name() const { return this->name_; }
@@ -77,6 +85,8 @@ class X3DOpening {
       this->tilt_->publish_state(tilted);
     if (this->state_ != nullptr)
       this->state_->publish_state(handle_state_to_string(state));
+    for (auto *listener : this->listeners_)
+      listener->on_handle(state, tilted);
   }
 
   uint32_t x3d_id_;
@@ -88,6 +98,7 @@ class X3DOpening {
   binary_sensor::BinarySensor *tilt_{nullptr};
   text_sensor::TextSensor *state_{nullptr};
   sensor::Sensor *rssi_{nullptr};
+  std::vector<HandleListener *> listeners_;
 };
 
 class X3DRFM69 : public Component,
@@ -117,6 +128,9 @@ class X3DRFM69 : public Component,
   }
   void add_rssi_sensor(uint32_t x3d_id, sensor::Sensor *sensor) {
     this->opening_for_(x3d_id, sensor)->set_rssi_sensor(sensor);
+  }
+  void add_handle_listener(uint32_t x3d_id, EntityBase *entity, HandleListener *listener) {
+    this->opening_for_(x3d_id, entity)->add_handle_listener(listener);
   }
   /// Hub-wide text sensor showing the last event of any device (discovery).
   void set_last_frame_sensor(text_sensor::TextSensor *sensor) { this->last_frame_ = sensor; }
