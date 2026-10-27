@@ -395,6 +395,15 @@ x3d_rfm69:
     each time, for at least 10 s (instead of the usual 3 + 3 repeats).
 
   Raw captures: [`tests/unsupported_frames.txt`](tests/unsupported_frames.txt).
+- **Door DVI calibration.** Doors use a different DVI (no reed switch, no
+  magnet). Per the K•LINE POD installation manual (page 9), a door DVI must be
+  recalibrated as soon as it has been removed from the frame (*dormant*): put
+  it back in the frame, close the door, then do **3 lock / unlock cycles with
+  the key**. Observed before calibration: the door only ever reports
+  `05 41 82 00 50 00 04` (unlocked), about once per second, whatever is in
+  front of the sensor. Byte 8 bit `0x01` / byte 14 `0x04` may flag the missing
+  calibration (Tydom exposes a `calibrationDefect` field for doors only); not
+  confirmed yet.
 
 ## Tests
 

@@ -50,7 +50,7 @@ Byte 8 flags, byte 9 state, byte 12 kind (`20` window, `40` sliding, `50` door):
 13 FF ** 00 2D ****** 08 41 8200200000 cccc qqqq   Window, unlocked (tilt)
 13 FF ** 00 2D ****** 00 01 8200400000 cccc qqqq   Sliding door, locked
 13 FF ** 00 2D ****** 04 41 8200400000 cccc qqqq   Sliding door, unlocked
-13 FF ** 00 2D ****** 05 41 8200500004 cccc qqqq   Door, unlocked (sent ~1/s after magnet activation)
+13 FF ** 00 2D ****** 05 41 8200500004 cccc qqqq   Door, unlocked, ~1/s, before calibration (3 lock/unlock cycles with the key)
 13 FF ** 00 2D ****** 00 00 8200400000 cccc qqqq   Not changed
 ```
 
