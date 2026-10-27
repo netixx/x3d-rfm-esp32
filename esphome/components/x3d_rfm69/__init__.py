@@ -20,6 +20,7 @@ CONF_DIO0_PIN = "dio0_pin"
 CONF_LOG_UNCLAIMED_DEVICES = "log_unclaimed_devices"
 CONF_RESTORE_STATE = "restore_state"
 CONF_TIMEOUT = "timeout"
+CONF_TRACE = "trace"
 CONF_ON_OPENING_EVENT = "on_opening_event"
 
 x3d_rfm69_ns = cg.esphome_ns.namespace("x3d_rfm69")
@@ -105,6 +106,8 @@ CONFIG_SCHEMA = (
             cv.Optional(
                 CONF_TIMEOUT, default="0s"
             ): cv.positive_time_period_milliseconds,
+            # Log every frame of these IDs at INFO, tag "x3d_rfm69.trace".
+            cv.Optional(CONF_TRACE, default=[]): cv.ensure_list(x3d_id),
             cv.Optional(CONF_ON_OPENING_EVENT): automation.validate_automation(
                 single=True
             ),
@@ -141,6 +144,8 @@ async def to_code(config):
     cg.add(var.set_log_unclaimed_devices(config[CONF_LOG_UNCLAIMED_DEVICES]))
     cg.add(var.set_restore_state(config[CONF_RESTORE_STATE]))
     cg.add(var.set_timeout(config[CONF_TIMEOUT]))
+    for trace_id in config[CONF_TRACE]:
+        cg.add(var.add_trace_id(trace_id))
 
     if CONF_ON_OPENING_EVENT in config:
         await automation.build_automation(

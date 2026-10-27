@@ -8,6 +8,9 @@
 namespace esphome::x3d_rfm69 {
 
 static const char *const TAG = "x3d_rfm69";
+// Every frame of the IDs listed in `trace:`, at INFO, under its own tag so
+// the main tag can be quieted with `logger: logs: x3d_rfm69: WARN`.
+static const char *const TRACE_TAG = "x3d_rfm69.trace";
 
 // SX1231 registers used here.
 static constexpr uint8_t REG_FIFO = 0x00;
@@ -277,6 +280,14 @@ X3DOpening *X3DRFM69::opening_for_(uint32_t x3d_id, EntityBase *entity) {
   return opening;
 }
 
+bool X3DRFM69::is_traced_(uint32_t x3d_id) const {
+  for (uint32_t id : this->trace_ids_) {
+    if (id == x3d_id)
+      return true;
+  }
+  return false;
+}
+
 bool X3DRFM69::first_sighting_(uint32_t x3d_id) {
   static constexpr size_t MAX_SIGHTED = 64;
   for (uint32_t id : this->sighted_) {
@@ -328,7 +339,13 @@ void X3DRFM69::handle_frame_(const uint8_t *buf, size_t len, float rssi) {
   char id_str[7];
   snprintf(id_str, sizeof(id_str), "%06" PRIX32, common.device_id);
 
-  if (!this->dedup_.is_new(common.device_id, common.msg_no, millis())) {
+  const bool traced = this->is_traced_(common.device_id);
+  const bool is_new = this->dedup_.is_new(common.device_id, common.msg_no, millis());
+  if (traced) {
+    ESP_LOGI(TRACE_TAG, "0x%s %s %s message, msg 0x%02X, %.1f dBm: %s", id_str, is_new ? "new" : "repeat",
+             msg_type_to_string(common.msg_type), common.msg_no, rssi, to_hex(buf, common.length).c_str());
+  }
+  if (!is_new) {
     ESP_LOGV(TAG, "0x%s: repeat of msg 0x%02X", id_str, common.msg_no);
     return;
   }
@@ -358,6 +375,9 @@ void X3DRFM69::handle_frame_(const uint8_t *buf, size_t len, float rssi) {
   SensorFrame frame{};
   res = parse_sensor_frame(buf, len, &frame);
   if (res != ParseResult::OK) {
+    if (traced) {
+      ESP_LOGI(TRACE_TAG, "0x%s: sensor message rejected (%s)", id_str, parse_result_to_string(res));
+    }
     ESP_LOGD(TAG, "0x%s: sensor message rejected (%s), %.1f dBm", id_str, parse_result_to_string(res), rssi);
     ESP_LOGV(TAG, "0x%s: raw %s", id_str, raw.c_str());
     return;
@@ -372,6 +392,10 @@ void X3DRFM69::handle_frame_(const uint8_t *buf, size_t len, float rssi) {
     shown_str = "announce (wake-up frame, no handle position)";
   }
   const char *kind_str = sensor_kind_to_string(frame);
+  if (traced) {
+    ESP_LOGI(TRACE_TAG, "0x%s decoded: %s (%s), bytes 8-9: %02X %02X", id_str, shown_str, kind_str, frame.flags,
+             frame.state_byte);
+  }
 
   if (opening == nullptr) {
     if (this->log_unclaimed_devices_) {

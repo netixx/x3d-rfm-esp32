@@ -241,6 +241,29 @@ logger:
     wifi: DEBUG
 ```
 
+### Tracing some devices
+
+With many openings, DEBUG gets hard to read. List the IDs to follow under
+`trace:`: every frame they send (new ones and radio repeats, raw bytes and
+decoded state) is logged at INFO under its own tag, `x3d_rfm69.trace`. ESPHome
+filters logs by tag, so quiet the main tag to see only the traced devices:
+
+```yaml
+x3d_rfm69:
+  trace: [0xEFCC85, 0xEFA214]
+
+logger:
+  level: DEBUG
+  logs:
+    x3d_rfm69: WARN       # hide the per-frame lines of all the other devices
+```
+
+```
+[I][x3d_rfm69.trace]: 0xEFCC85 new sensor message, msg 0x55, -67.5 dBm: 13 ff 55 00 2d 85 cc ef 08 41 82 00 20 00 00 fc d5 75 49
+[I][x3d_rfm69.trace]: 0xEFCC85 decoded: unlocked (tilt) (window), bytes 8-9: 08 41
+[I][x3d_rfm69.trace]: 0xEFCC85 repeat sensor message, msg 0x55, -68.0 dBm: 13 ff 55 00 2d 85 cc ef 08 41 82 00 20 00 00 fc d5 75 49
+```
+
 ## Entity states after a reboot
 
 The DVI only transmits when the handle moves, so after a reboot nothing is
@@ -283,6 +306,17 @@ x3d_rfm69:
 
 Too short a timeout blanks working sensors between heartbeats.
 
+With MQTT, numeric sensors also accept ESPHome's `expire_after`: Home
+Assistant then shows them *unavailable* when no value arrives in time. The RSSI
+sensor publishes on every frame, so it fits (there's no equivalent for binary
+sensors or for the native API):
+
+```yaml
+sensor:
+  - id: !extend bathroom_window_rssi
+    expire_after: 26h
+```
+
 ## Hub options
 
 ```yaml
@@ -295,6 +329,7 @@ x3d_rfm69:
   log_unclaimed_devices: true
   restore_state: true      # publish the last saved handle position at boot
   timeout: 0s              # off; clear entities of devices silent this long
+  trace: []                # IDs whose frames are all logged, tag x3d_rfm69.trace
   on_opening_event: ...    # automation, see below
 ```
 

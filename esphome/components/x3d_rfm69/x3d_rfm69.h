@@ -169,6 +169,8 @@ class X3DRFM69 : public Component,
   void set_log_unclaimed_devices(bool log) { this->log_unclaimed_devices_ = log; }
   void set_restore_state(bool restore) { this->restore_state_ = restore; }
   void set_timeout(uint32_t timeout_ms) { this->timeout_ms_ = timeout_ms; }
+  /// Log every frame of this device at INFO under the tag "x3d_rfm69.trace".
+  void add_trace_id(uint32_t x3d_id) { this->trace_ids_.push_back(x3d_id); }
 
   /// `platform: x3d_rfm69` entities: attached to the opening of their X3D
   /// device, created on first use.
@@ -210,6 +212,7 @@ class X3DRFM69 : public Component,
   X3DOpening *opening_for_(uint32_t x3d_id, EntityBase *entity);
   /// True the first time an unclaimed device is seen since boot.
   bool first_sighting_(uint32_t x3d_id);
+  bool is_traced_(uint32_t x3d_id) const;
   /// True the first time a device sends these unexpected bytes 8-14 since boot.
   bool first_unexpected_(const SensorFrame &frame);
   /// Warn once if an opening was configured with the ID in raw (byte-reversed) order.
@@ -228,6 +231,7 @@ class X3DRFM69 : public Component,
   std::vector<X3DOpening *> openings_;
   std::vector<uint32_t> sighted_;
   std::vector<uint32_t> warned_;
+  std::vector<uint32_t> trace_ids_;
   text_sensor::TextSensor *last_frame_{nullptr};
   Trigger<std::string, std::string, bool, std::string, float, std::string> event_trigger_;
 };
