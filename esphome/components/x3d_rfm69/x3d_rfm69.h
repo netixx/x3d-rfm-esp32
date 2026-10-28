@@ -18,13 +18,38 @@
 
 namespace esphome::x3d_rfm69 {
 
-/// Gets every handle position of one X3D device, e.g. the read-only lock
-/// entity, which lives in its own platform so the hub doesn't need `lock`.
+/// Gets every handle position of one or more X3D devices: combined lock
+/// entities, and the read-only lock entity (own platform, so the hub doesn't
+/// need `lock`).
 class HandleListener {
  public:
-  virtual void on_handle(HandleState state, bool tilted) = 0;
+  virtual void on_handle(uint32_t x3d_id, HandleState state, bool tilted) = 0;
   /// No frame for longer than the timeout: the position is unknown.
-  virtual void on_timeout() {}
+  virtual void on_timeout(uint32_t x3d_id) {}
+};
+
+/// Lock binary sensor combining several sashes (`x3d_id: [left, right]`):
+/// unlocked as soon as one sash is, locked when all are, unknown otherwise.
+class X3DCombinedLockSensor : public HandleListener {
+ public:
+  explicit X3DCombinedLockSensor(binary_sensor::BinarySensor *sensor) : sensor_(sensor) {}
+  void add_x3d_id(uint32_t x3d_id) { this->combiner_.add(x3d_id); }
+  void on_handle(uint32_t x3d_id, HandleState state, bool /*tilted*/) override {
+    this->publish_(this->combiner_.update(x3d_id, state));
+  }
+  void on_timeout(uint32_t x3d_id) override { this->publish_(this->combiner_.update(x3d_id, HandleState::UNCHANGED)); }
+
+ protected:
+  void publish_(HandleState combined) {
+    // Home Assistant lock device class: ON means unlocked.
+    if (has_handle_position(combined)) {
+      this->sensor_->publish_state(combined == HandleState::UNLOCKED);
+    } else {
+      this->sensor_->invalidate_state();
+    }
+  }
+  binary_sensor::BinarySensor *sensor_;
+  HandleCombiner combiner_;
 };
 
 /// Entities of one X3D device (one sash of a window or door), grouped by the hub.
@@ -37,6 +62,7 @@ class X3DOpening {
   void set_state_sensor(text_sensor::TextSensor *sensor) { this->state_ = sensor; }
   void set_rssi_sensor(sensor::Sensor *sensor) { this->rssi_ = sensor; }
   void set_connectivity_sensor(binary_sensor::BinarySensor *sensor) { this->connectivity_ = sensor; }
+  void set_battery_sensor(binary_sensor::BinarySensor *sensor) { this->battery_ = sensor; }
   void add_handle_listener(HandleListener *listener) { this->listeners_.push_back(listener); }
 
   uint32_t get_x3d_id() const { return this->x3d_id_; }
@@ -58,6 +84,9 @@ class X3DOpening {
   /// Handle event (sensor message).
   void publish(const SensorFrame &frame, float rssi) {
     this->heard_(!has_handle_position(frame.state));
+    // Battery class: ON = low. Suspected flag, or silence (see check_timeout).
+    if (this->battery_ != nullptr && frame.state != HandleState::ANNOUNCE)
+      this->battery_->publish_state(is_battery_low(frame));
     if (has_handle_position(frame.state)) {
       const bool tilted = is_tilted(frame);
       this->publish_handle_(frame.state, tilted);
@@ -93,8 +122,10 @@ class X3DOpening {
       this->rssi_->publish_state(NAN);
     if (this->connectivity_ != nullptr)
       this->connectivity_->publish_state(false);
+    if (this->battery_ != nullptr)
+      this->battery_->publish_state(true);  // silent: battery probably dead
     for (auto *listener : this->listeners_)
-      listener->on_timeout();
+      listener->on_timeout(this->x3d_id_);
     return true;
   }
   uint32_t get_last_seen_ms() const { return this->last_seen_ms_; }
@@ -135,7 +166,7 @@ class X3DOpening {
     if (this->state_ != nullptr)
       this->state_->publish_state(handle_state_to_string(state));
     for (auto *listener : this->listeners_)
-      listener->on_handle(state, tilted);
+      listener->on_handle(this->x3d_id_, state, tilted);
   }
 
   uint32_t x3d_id_;
@@ -148,6 +179,7 @@ class X3DOpening {
   text_sensor::TextSensor *state_{nullptr};
   sensor::Sensor *rssi_{nullptr};
   binary_sensor::BinarySensor *connectivity_{nullptr};
+  binary_sensor::BinarySensor *battery_{nullptr};
   std::vector<HandleListener *> listeners_;
   uint32_t last_seen_ms_{0};
   bool timed_out_{false};
@@ -189,8 +221,19 @@ class X3DRFM69 : public Component,
   void add_connectivity_sensor(uint32_t x3d_id, binary_sensor::BinarySensor *sensor) {
     this->opening_for_(x3d_id, sensor)->set_connectivity_sensor(sensor);
   }
+  void add_battery_sensor(uint32_t x3d_id, binary_sensor::BinarySensor *sensor) {
+    this->opening_for_(x3d_id, sensor)->set_battery_sensor(sensor);
+  }
   void add_handle_listener(uint32_t x3d_id, EntityBase *entity, HandleListener *listener) {
     this->opening_for_(x3d_id, entity)->add_handle_listener(listener);
+  }
+  /// Lock binary sensor over several sashes (`x3d_id` list).
+  void add_combined_lock_sensor(binary_sensor::BinarySensor *sensor, const std::vector<uint32_t> &x3d_ids) {
+    auto *combined = new X3DCombinedLockSensor(sensor);  // NOLINT(cppcoreguidelines-owning-memory): lives forever
+    for (uint32_t x3d_id : x3d_ids) {
+      combined->add_x3d_id(x3d_id);
+      this->add_handle_listener(x3d_id, sensor, combined);
+    }
   }
   /// Hub-wide text sensor showing the last event of any device (discovery).
   void set_last_frame_sensor(text_sensor::TextSensor *sensor) { this->last_frame_ = sensor; }

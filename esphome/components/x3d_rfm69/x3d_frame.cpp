@@ -122,6 +122,10 @@ bool is_tilted(const SensorFrame &frame) {
   return frame.state == HandleState::UNLOCKED && (frame.flags & DVI_FLAG_TILT) != 0;
 }
 
+bool is_battery_low(const SensorFrame &frame) {
+  return frame.state != HandleState::ANNOUNCE && (frame.flags & DVI_FLAG_BATTERY_LOW) != 0;
+}
+
 const char *sensor_kind_to_string(const SensorFrame &frame) {
   if (frame.extra_len >= 3) {
     if (frame.extra[2] == 0x20)
@@ -186,6 +190,21 @@ bool has_unexpected_bits(const SensorFrame &frame) {
       return false;
   }
   return true;
+}
+
+HandleState HandleCombiner::update(uint32_t x3d_id, HandleState state) {
+  for (size_t i = 0; i < this->count_; i++) {
+    if (this->ids_[i] == x3d_id)
+      this->states_[i] = has_handle_position(state) ? state : HandleState::UNCHANGED;
+  }
+  bool all_locked = this->count_ > 0;
+  for (size_t i = 0; i < this->count_; i++) {
+    if (this->states_[i] == HandleState::UNLOCKED)
+      return HandleState::UNLOCKED;
+    if (this->states_[i] != HandleState::LOCKED)
+      all_locked = false;
+  }
+  return all_locked ? HandleState::LOCKED : HandleState::UNCHANGED;
 }
 
 bool Deduplicator::is_new(uint32_t device_id, uint8_t msg_no, uint32_t now_ms) {

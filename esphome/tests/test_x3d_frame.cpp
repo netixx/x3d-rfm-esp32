@@ -228,6 +228,41 @@ static void test_announce_frame() {
   CHECK(std::strcmp(handle_state_to_string(f.state), "announce") == 0);
 }
 
+static void test_battery_flag() {
+  SensorFrame f{};
+  CHECK(parse_sensor_frame(CAPTURES[0].frame, 19, &f) == ParseResult::OK);
+  CHECK(!is_battery_low(f));
+  f.flags |= DVI_FLAG_BATTERY_LOW;
+  CHECK(is_battery_low(f));
+  CHECK(has_unexpected_bits(f));  // still reported until confirmed
+  f.state = HandleState::ANNOUNCE;
+  CHECK(!is_battery_low(f));
+}
+
+static void test_handle_combiner() {
+  HandleCombiner c;
+  c.add(0xEFA00B);
+  c.add(0xEFACF4);
+  CHECK(c.update(0xEFA00B, HandleState::LOCKED) == HandleState::UNCHANGED);  // right still unknown
+  CHECK(c.update(0xEFACF4, HandleState::LOCKED) == HandleState::LOCKED);
+  CHECK(c.update(0xEFA00B, HandleState::UNLOCKED) == HandleState::UNLOCKED);
+  // An update after an unlocked sash is still recorded.
+  CHECK(c.update(0xEFACF4, HandleState::UNLOCKED) == HandleState::UNLOCKED);
+  CHECK(c.update(0xEFA00B, HandleState::LOCKED) == HandleState::UNLOCKED);  // right still unlocked
+  CHECK(c.update(0xEFACF4, HandleState::LOCKED) == HandleState::LOCKED);
+  // A sash going silent (timeout) makes the combined state unknown.
+  CHECK(c.update(0xEFACF4, HandleState::UNCHANGED) == HandleState::UNCHANGED);
+  // Announce frames carry no position: treated as unknown.
+  CHECK(c.update(0xEFACF4, HandleState::ANNOUNCE) == HandleState::UNCHANGED);
+  // Unknown IDs are ignored.
+  CHECK(c.update(0x123456, HandleState::UNLOCKED) == HandleState::UNCHANGED);
+
+  HandleCombiner single;
+  single.add(0xEFCC85);
+  CHECK(single.update(0xEFCC85, HandleState::LOCKED) == HandleState::LOCKED);
+  CHECK(single.update(0xEFCC85, HandleState::UNLOCKED) == HandleState::UNLOCKED);
+}
+
 static void test_decode_state() {
   CHECK(decode_handle_state(0x41) == HandleState::UNLOCKED);
   CHECK(decode_handle_state(0x01) == HandleState::LOCKED);
@@ -297,6 +332,8 @@ int main() {
   test_msb_misread_frame();
   test_door_frame();
   test_announce_frame();
+  test_battery_flag();
+  test_handle_combiner();
   test_decode_state();
   test_replay_capture();
   test_dedup();

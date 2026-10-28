@@ -22,6 +22,10 @@ static constexpr uint8_t DVI_STATE_ANNOUNCE_BIT = 0x80;
 // 0x04 on a sliding door. Read as Tydom's OPEN_HOPPER (tilt) vs UNLOCKED.
 // Not yet checked on a tilt-and-turn window.
 static constexpr uint8_t DVI_FLAG_TILT = 0x08;
+// Suspected low battery bit in byte 8 (unconfirmed): same flags byte as the
+// first payload byte of standard messages, where 0x10 is "battery low"
+// (X3D-Protocol.md), and the door sends 0x05 there like their `05 98` header.
+static constexpr uint8_t DVI_FLAG_BATTERY_LOW = 0x10;
 
 enum class HandleState : uint8_t {
   UNCHANGED = 0,  // "state not changed" message (state byte 0x00), maybe a heartbeat
@@ -86,6 +90,10 @@ const char *handle_state_to_string(HandleState state);
 /// Handle in tilt position (unlocked with the tilt flag).
 bool is_tilted(const SensorFrame &frame);
 
+/// Suspected low battery flag (byte 8 bit 0x10, unconfirmed). Never set on
+/// announce frames, which have another layout.
+bool is_battery_low(const SensorFrame &frame);
+
 /// Sensor kind from byte 12: 0x20 on a tilt (soufflet) window, 0x40 on a
 /// sliding door, 0x50 on a door. Same split as Tydom's windowFrench /
 /// windowSliding / door device types.
@@ -95,6 +103,25 @@ const char *parse_result_to_string(ParseResult result);
 /// True when bytes 8-14 differ from every value captured so far
 /// (candidate for battery low, tamper, ...).
 bool has_unexpected_bits(const SensorFrame &frame);
+
+/// Combined handle state of several sashes (one window or door): UNLOCKED as
+/// soon as one sash is, LOCKED when all are, UNCHANGED (unknown) otherwise.
+class HandleCombiner {
+ public:
+  static constexpr size_t MAX_SASHES = 4;
+
+  void add(uint32_t x3d_id) {
+    if (this->count_ < MAX_SASHES)
+      this->ids_[this->count_++] = x3d_id;
+  }
+  /// Record one sash (UNCHANGED = unknown, e.g. after a timeout); returns the combined state.
+  HandleState update(uint32_t x3d_id, HandleState state);
+
+ protected:
+  uint32_t ids_[MAX_SASHES]{};
+  HandleState states_[MAX_SASHES]{};
+  size_t count_{0};
+};
 
 /// Drops the X3D repeats: each event is sent 3 times ~20 ms apart, and the burst
 /// is usually sent again ~3.5-4 s later, all with the same message number.

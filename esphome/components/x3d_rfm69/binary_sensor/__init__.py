@@ -7,6 +7,7 @@ from esphome.components import binary_sensor
 from esphome.const import (
     CONF_ID,
     CONF_TYPE,
+    DEVICE_CLASS_BATTERY,
     DEVICE_CLASS_CONNECTIVITY,
     DEVICE_CLASS_LOCK,
     ENTITY_CATEGORY_DIAGNOSTIC,
@@ -20,6 +21,7 @@ from .. import (
     DOMAIN,
     X3D_ENTITY_SCHEMA,
     unique_entity_final_validate,
+    x3d_ids,
 )
 
 DEPENDENCIES = ["x3d_rfm69"]
@@ -27,16 +29,27 @@ DEPENDENCIES = ["x3d_rfm69"]
 TYPE_LOCK = "lock"
 TYPE_TILT = "tilt"
 TYPE_CONNECTIVITY = "connectivity"
+TYPE_BATTERY = "battery"
 
 CONFIG_SCHEMA = cv.typed_schema(
     {
         # Home Assistant "lock" class: shown as Locked / Unlocked, ON = unlocked
+        # With several IDs (sashes of one opening): combined, unlocked as soon
+        # as one sash is, locked when all are.
         TYPE_LOCK: binary_sensor.binary_sensor_schema(
             device_class=DEVICE_CLASS_LOCK,
-        ).extend(X3D_ENTITY_SCHEMA),
+        )
+        .extend(X3D_ENTITY_SCHEMA)
+        .extend({cv.Required(CONF_X3D_ID): x3d_ids}),
         # Handle in tilt position (tilt / tilt-and-turn windows). ON = tilted
         TYPE_TILT: binary_sensor.binary_sensor_schema(
             icon="mdi:window-open-variant",
+        ).extend(X3D_ENTITY_SCHEMA),
+        # Battery class, ON = low: suspected low battery flag (byte 8 bit 0x10,
+        # unconfirmed) or silent for longer than the hub `timeout`.
+        TYPE_BATTERY: binary_sensor.binary_sensor_schema(
+            device_class=DEVICE_CLASS_BATTERY,
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ).extend(X3D_ENTITY_SCHEMA),
         # ON while frames arrive, OFF after the hub `timeout` (battery dead?)
         TYPE_CONNECTIVITY: binary_sensor.binary_sensor_schema(
@@ -75,8 +88,14 @@ async def to_code(config):
     hub = await cg.get_variable(config[CONF_X3D_RFM69_ID])
     sens = await binary_sensor.new_binary_sensor(config)
     if config[CONF_TYPE] == TYPE_LOCK:
-        cg.add(hub.add_lock_sensor(config[CONF_X3D_ID], sens))
+        ids = config[CONF_X3D_ID]
+        if len(ids) == 1:
+            cg.add(hub.add_lock_sensor(ids[0], sens))
+        else:
+            cg.add(hub.add_combined_lock_sensor(sens, ids))
     elif config[CONF_TYPE] == TYPE_TILT:
         cg.add(hub.add_tilt_sensor(config[CONF_X3D_ID], sens))
+    elif config[CONF_TYPE] == TYPE_BATTERY:
+        cg.add(hub.add_battery_sensor(config[CONF_X3D_ID], sens))
     else:
         cg.add(hub.add_connectivity_sensor(config[CONF_X3D_ID], sens))

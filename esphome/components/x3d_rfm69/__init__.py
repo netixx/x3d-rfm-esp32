@@ -43,6 +43,16 @@ def x3d_id(value):
     return value
 
 
+def x3d_ids(value):
+    """One radio ID, or a list of up to 4 (sashes of one window or door, combined)."""
+    value = cv.ensure_list(x3d_id)(value)
+    if not 1 <= len(value) <= 4:
+        raise cv.Invalid("Give 1 to 4 radio IDs")
+    if len(set(value)) != len(value):
+        raise cv.Invalid("Radio IDs must be different")
+    return value
+
+
 # Common keys of the `platform: x3d_rfm69` entities.
 X3D_ENTITY_SCHEMA = cv.Schema(
     {
@@ -60,9 +70,10 @@ def unique_entity_final_validate(domain, default_type):
     type, otherwise only one of them would be updated."""
 
     def key(conf):
+        ids = conf.get(CONF_X3D_ID)
         return (
             str(conf[CONF_X3D_RFM69_ID]),
-            conf.get(CONF_X3D_ID),
+            tuple(ids) if isinstance(ids, list) else ids,
             conf.get(CONF_TYPE, default_type),
         )
 
@@ -77,11 +88,12 @@ def unique_entity_final_validate(domain, default_type):
             and key(conf) == key(config)
         ]
         if len(same) > 1:
-            owner = (
-                f"Device 0x{config[CONF_X3D_ID]:06X}"
-                if CONF_X3D_ID in config
-                else "The radio"
-            )
+            ids = config.get(CONF_X3D_ID)
+            if ids is None:
+                owner = "The radio"
+            else:
+                ids = ids if isinstance(ids, list) else [ids]
+                owner = "Device " + " + ".join(f"0x{i:06X}" for i in ids)
             raise cv.Invalid(
                 f"{owner} has {len(same)} '{key(config)[2]}' {domain} entities, keep one"
             )

@@ -97,7 +97,11 @@ give it an area there.
   *Unlocked* (its raw value is ON when unlocked, HA's convention).
 - `Tilted` is ON when the handle is in the tilt position.
 - The combined `Lock` of the double profiles is *Unlocked* as soon as one sash
-  is, *Locked* when both are, and unknown otherwise.
+  is, *Locked* when both are, and unknown otherwise. Set `sash_entities: false`
+  to keep only that combined entity. Home Assistant can't show per-sash
+  details inside one entity (ESPHome entities have no attributes); with
+  `sash_entities: true` the device page lists `Left lock` / `Right lock`
+  next to it.
 - `window`, `door` and `sliding_door` create the same entities; the name only
   documents your config.
 
@@ -105,10 +109,12 @@ Optional vars, on every profile:
 
 | Var     | Adds                                               |
 |---------|----------------------------------------------------|
+| `sash_entities: false` | double profiles only: keep the combined `Lock`, drop `Left lock` / `Right lock` |
 | `rssi: true`  | `RSSI` sensor in dBm, updated on every frame: acts as "last seen" |
 | `state: true` | `State` text sensor: `locked` / `unlocked`  |
+| `battery: true` | `Battery` binary sensor (low = ON): suspected low battery flag, or silent past the hub `timeout`, see [Silent sensors](#silent-sensors-and-dead-batteries) |
 | `connectivity: true` | `Connectivity` binary sensor: OFF when the DVI sent nothing for the hub `timeout` (needs `timeout`, see [Silent sensors](#silent-sensors-and-dead-batteries)) |
-| `lock_entity: true` | read-only `Handle` lock entity (`Left handle` / `Right handle`), a workaround, see [below](#workaround-security-section-of-the-area-dashboard) |
+| `lock_entity: true` | read-only `Handle` lock entity (combined state on double profiles), a workaround, see [below](#workaround-security-section-of-the-area-dashboard) |
 
 Entity ids are `<id>_lock`, `<id>_tilted`, `<id>_rssi`, `<id>_state`, and
 `<id>_left_lock`, `<id>_right_lock`... for the double profiles. Customize any
@@ -128,9 +134,9 @@ Home Assistant's area (rooms) dashboard only lists `lock`, `alarm_control_panel`
 and `camera` entities in its **Security** section. The `Lock` binary sensor
 (device class `lock`) shows in the global Security dashboard, but not there.
 
-As a workaround, `lock_entity: true` adds a read-only **lock** entity per sash
-(`Handle`), which the area dashboard picks up. It follows the handle like the
-binary sensor. The radio only receives, so the Lock / Unlock buttons Home
+As a workaround, `lock_entity: true` adds one read-only **lock** entity per
+opening (`Handle`), which the area dashboard picks up. It follows the handle
+like the binary sensor; on double profiles it has the combined state. The radio only receives, so the Lock / Unlock buttons Home
 Assistant shows can't work: commands are refused (logged as a warning) and the
 real state is published again. Prefer the binary sensor everywhere else.
 
@@ -147,8 +153,11 @@ write yourself. `x3d_id` says which radio device an entity follows:
 binary_sensor:
   - platform: x3d_rfm69
     x3d_id: 0xEFCC85
-    type: lock              # lock (default) or tilt
+    type: lock              # lock (default), tilt, connectivity or battery
     name: "Bathroom window lock"
+  - platform: x3d_rfm69
+    x3d_id: [0xEFA00B, 0xEFACF4]   # several sashes: combined lock
+    name: "Living room door lock"
 
 text_sensor:
   - platform: x3d_rfm69
@@ -163,7 +172,7 @@ sensor:
 
 lock:                       # read-only workaround, see above
   - platform: x3d_rfm69
-    x3d_id: 0xEFCC85
+    x3d_id: 0xEFCC85        # or a list: combined state
     name: "Bathroom window handle"
 ```
 
@@ -292,6 +301,16 @@ The next frame of any kind brings it back: a "not changed" heartbeat
 publishes the last known position again. The `connectivity` entity (profile var
 `connectivity: true`, or `type: connectivity`) shows the same as a binary
 sensor you can alert on.
+
+The `battery` entity (profile var `battery: true`, or `type: battery`, Home
+Assistant's battery class: ON = low) turns on when a frame carries the
+suspected low battery flag, or when the device went silent past the
+`timeout`. The flag is a guess: standard X3D messages use bit `0x10` of their
+first payload byte for "battery low" ([X3D-Protocol.md](../X3D-Protocol.md)),
+and the DVI's byte 8 looks like the same flags byte (the door sends `05`
+there, like their `05 98` header), so a low DVI should send `1x` in byte 8.
+Not seen yet: frames with that bit are still reported with a warning, please
+send them.
 
 The timeout is **off by default**: how often a DVI sends a heartbeat when
 nothing happens isn't known yet (Tydom shows a `supervisionMode` setting,
