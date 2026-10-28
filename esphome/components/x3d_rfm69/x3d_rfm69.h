@@ -267,7 +267,7 @@ class X3DRFM69 : public Component,
   uint32_t frequency_{868950000};
   bool log_unclaimed_devices_{true};
   bool restore_state_{true};
-  uint32_t timeout_ms_{0};
+  uint32_t timeout_ms_{6 * 3600 * 1000};
   uint8_t mode_{0xff};
 
   Deduplicator dedup_;

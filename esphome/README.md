@@ -97,11 +97,15 @@ give it an area there.
   *Unlocked* (its raw value is ON when unlocked, HA's convention).
 - `Tilted` is ON when the handle is in the tilt position.
 - The combined `Lock` of the double profiles is *Unlocked* as soon as one sash
-  is, *Locked* when both are, and unknown otherwise. Set `sash_entities: false`
-  to keep only that combined entity. Home Assistant can't show per-sash
-  details inside one entity (ESPHome entities have no attributes); with
-  `sash_entities: true` the device page lists `Left lock` / `Right lock`
-  next to it.
+  is, *Locked* when both are, and unknown otherwise.
+- **One entity per opening in Home Assistant's Security views.** The Security
+  dashboard and the rooms' Security section only list entities without an
+  entity category. Each profile leaves exactly one there: the `Lock` binary
+  sensor, or the `Handle` lock when `lock_entity: true` (then `Lock` becomes a
+  diagnostic entity). Everything else per sash (`Left lock` / `Right lock`,
+  RSSI, battery, connectivity, state) is *diagnostic*: listed on the device
+  page, with history, usable in automations, but not in the Security views.
+  That's where you see which side is unlocked.
 - `window`, `door` and `sliding_door` create the same entities; the name only
   documents your config.
 
@@ -109,11 +113,10 @@ Optional vars, on every profile:
 
 | Var     | Adds                                               |
 |---------|----------------------------------------------------|
-| `sash_entities: false` | double profiles only: keep the combined `Lock`, drop `Left lock` / `Right lock` |
 | `rssi: true`  | `RSSI` sensor in dBm, updated on every frame: acts as "last seen" |
 | `state: true` | `State` text sensor: `locked` / `unlocked`  |
 | `battery: true` | `Battery` binary sensor (low = ON): suspected low battery flag, or silent past the hub `timeout`, see [Silent sensors](#silent-sensors-and-dead-batteries) |
-| `connectivity: true` | `Connectivity` binary sensor: OFF when the DVI sent nothing for the hub `timeout` (needs `timeout`, see [Silent sensors](#silent-sensors-and-dead-batteries)) |
+| `connectivity: true` | `Connectivity` binary sensor: OFF when the DVI sent nothing for the hub `timeout`, see [Silent sensors](#silent-sensors-and-dead-batteries) |
 | `lock_entity: true` | read-only `Handle` lock entity (combined state on double profiles), a workaround, see [below](#workaround-security-section-of-the-area-dashboard) |
 
 Entity ids are `<id>_lock`, `<id>_tilted`, `<id>_rssi`, `<id>_state`, and
@@ -288,7 +291,7 @@ opening or changing its profile. Remove it from Home Assistant
 ## Silent sensors and dead batteries
 
 DVIs run on batteries. When a battery dies the sensor just stops sending, and
-its entities would keep their last state forever. With a hub `timeout`, a
+its entities would keep their last state forever. With the hub `timeout`, a
 claimed device that sent no frame at all for that long gets its entities
 cleared (*unknown* in Home Assistant: ESPHome can't make a single entity
 *unavailable*) and a warning is logged:
@@ -312,18 +315,17 @@ there, like their `05 98` header), so a low DVI should send `1x` in byte 8.
 Not seen yet: frames with that bit are still reported with a warning, please
 send them.
 
-The timeout is **off by default**: how often a DVI sends a heartbeat when
-nothing happens isn't known yet (Tydom shows a `supervisionMode` setting,
-`SHORT` / `LONG`). Measure it first: with `rssi: true`, the RSSI sensor updates
-on every frame, so its history shows the gaps; or watch the `unchanged` lines
-at DEBUG. Then set the timeout to 2-3 times the longest gap:
+The timeout defaults to **6 h**. How often a DVI sends a heartbeat when nothing
+happens isn't known yet (Tydom shows a `supervisionMode` setting, `SHORT` /
+`LONG`). If healthy sensors turn *unknown* between frames, the heartbeat is
+slower: measure it (with `rssi: true`, the RSSI sensor updates on every frame,
+so its history shows the gaps; or watch the `unchanged` lines at DEBUG) and set
+the timeout to 2-3 times the longest gap, or `0s` to turn it off:
 
 ```yaml
 x3d_rfm69:
   timeout: 26h
 ```
-
-Too short a timeout blanks working sensors between heartbeats.
 
 With MQTT, numeric sensors also accept ESPHome's `expire_after`: Home
 Assistant then shows them *unavailable* when no value arrives in time. The RSSI
@@ -347,7 +349,7 @@ x3d_rfm69:
   data_rate: 1MHz          # default, see Hardware
   log_unclaimed_devices: true
   restore_state: true      # publish the last saved handle position at boot
-  timeout: 0s              # off; clear entities of devices silent this long
+  timeout: 6h              # default; clear entities of devices silent this long, 0s = off
   trace: []                # IDs whose frames are all logged, tag x3d_rfm69.trace
   on_opening_event: ...    # automation, see below
 ```

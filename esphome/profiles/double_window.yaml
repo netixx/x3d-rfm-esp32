@@ -1,6 +1,7 @@
 # Window with two sashes ("deux vantaux"), one DVI per sash.
 # Creates an HA device "${name}" with a combined "Lock" (unlocked as soon as
-# one sash is, locked when both are, else unknown) and "Left lock" /
+# one sash is, locked when both are, else unknown) and, as diagnostic
+# entities (device page only, not in HA's Security views), "Left lock" /
 # "Right lock" for each sash.
 # Entity ids: ${id}_lock, ${id}_left_lock, ${id}_right_lock,
 # ${id}_left_rssi, ${id}_right_rssi, ${id}_left_state, ${id}_right_state,
@@ -12,7 +13,6 @@
 #   name:          device name in Home Assistant
 #   left_x3d_id:   radio ID of the left sash ("0xEFA00B")
 #   right_x3d_id:  radio ID of the right sash
-#   sash_entities: false to keep only the combined "Lock" (default true)
 #   rssi:          true to add "Left RSSI" / "Right RSSI" (default false)
 #   state:         true to add "Left state" / "Right state" (default false)
 #   connectivity:  true to add "Left connectivity" / "Right connectivity"
@@ -29,7 +29,6 @@
 # Optional entities are always listed and switched with "enabled", so the
 # profile works without conditional includes (older ESPHome releases).
 substitutions:
-  sash_entities: "true"
   rssi: "false"
   state: "false"
   lock_entity: "false"
@@ -50,20 +49,23 @@ binary_sensor:
     type: lock
     name: "Lock"
     device_id: ${id}
+    # Only one entity per opening in HA's Security views: this one, or the
+    # Handle lock when lock_entity is true.
+    entity_category: "${ 'diagnostic' if (lock_entity | string | lower) == 'true' else '' }"
   - platform: x3d_rfm69
     id: ${id}_left_lock
     x3d_id: ${left_x3d_id}
     type: lock
     name: "Left lock"
     device_id: ${id}
-    enabled: ${sash_entities}
+    entity_category: diagnostic  # device page only, not in Security views
   - platform: x3d_rfm69
     id: ${id}_right_lock
     x3d_id: ${right_x3d_id}
     type: lock
     name: "Right lock"
     device_id: ${id}
-    enabled: ${sash_entities}
+    entity_category: diagnostic  # device page only, not in Security views
   - platform: x3d_rfm69
     id: ${id}_left_connectivity
     x3d_id: ${left_x3d_id}
@@ -114,6 +116,7 @@ text_sensor:
     type: state
     name: "Left state"
     device_id: ${id}
+    entity_category: diagnostic
     enabled: ${state}
   - platform: x3d_rfm69
     id: ${id}_right_state
@@ -121,6 +124,7 @@ text_sensor:
     type: state
     name: "Right state"
     device_id: ${id}
+    entity_category: diagnostic
     enabled: ${state}
 
 # Read-only lock entity with the combined state, off by default

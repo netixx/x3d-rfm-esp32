@@ -70,8 +70,8 @@ def _connectivity_needs_timeout(config):
             and hub[CONF_TIMEOUT].total_milliseconds == 0
         ):
             raise cv.Invalid(
-                "A connectivity entity needs 'timeout' on x3d_rfm69, otherwise it "
-                "never turns off"
+                "A connectivity entity needs a 'timeout' on x3d_rfm69 (not 0s), "
+                "otherwise it never turns off"
             )
     return config
 

@@ -40,6 +40,9 @@ binary_sensor:
     type: lock
     name: "Lock"
     device_id: ${id}
+    # Only one entity per opening in HA's Security views: this one, or the
+    # Handle lock when lock_entity is true.
+    entity_category: "${ 'diagnostic' if (lock_entity | string | lower) == 'true' else '' }"
   - platform: x3d_rfm69
     id: ${id}_connectivity
     x3d_id: ${x3d_id}

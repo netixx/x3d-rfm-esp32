@@ -50,10 +50,13 @@ x3d_rfm69:
   log_unclaimed_devices: true
   # Publish the last saved handle position at boot (entities not "unknown").
   restore_state: true
+  # Entities of a device silent this long go unknown (battery dead?). 0s = off.
+  timeout: 6h
 
 # One package with the profiles from GitHub, one file entry per window or
 # door. Profiles: window, door, sliding_door, tilt_window, double_window,
-# double_sliding_door (esphome/profiles/). Optional vars: rssi, state.
+# double_sliding_door (esphome/profiles/). Optional vars: rssi, state,
+# battery, connectivity, lock_entity (see the README).
 packages:
   x3d_openings:
     url: https://github.com/netixx/x3d-rfm-esp32

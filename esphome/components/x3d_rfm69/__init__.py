@@ -114,9 +114,9 @@ CONFIG_SCHEMA = (
             # Publish the last saved handle position at boot.
             cv.Optional(CONF_RESTORE_STATE, default=True): cv.boolean,
             # Clear the entities of a claimed device silent for this long
-            # (battery dead). 0s = off. Set it from the measured heartbeat.
+            # (battery dead). 0s = off.
             cv.Optional(
-                CONF_TIMEOUT, default="0s"
+                CONF_TIMEOUT, default="6h"
             ): cv.positive_time_period_milliseconds,
             # Log every frame of these IDs at INFO, tag "x3d_rfm69.trace".
             cv.Optional(CONF_TRACE, default=[]): cv.ensure_list(x3d_id),
