@@ -101,8 +101,8 @@ give it an area there.
 - **One entity per opening in Home Assistant's Security views.** The Security
   dashboard and the rooms' Security section only list entities without an
   entity category. Each profile leaves exactly one there: the `Lock` binary
-  sensor, or the `Handle` lock when `lock_entity: true` (then `Lock` becomes a
-  diagnostic entity). Everything else per sash (`Left lock` / `Right lock`,
+  sensor, or, with `lock_entity: true`, the read-only `Lock` lock entity (the
+  binary sensor then becomes diagnostic). Everything else per sash (`Left lock` / `Right lock`,
   RSSI, battery, connectivity, state) is *diagnostic*: listed on the device
   page, with history, usable in automations, but not in the Security views.
   That's where you see which side is unlocked.
@@ -117,7 +117,7 @@ Optional vars, on every profile:
 | `state: true` | `State` text sensor: `locked` / `unlocked`  |
 | `battery: true` | `Battery` binary sensor (low = ON): suspected low battery flag, or silent past the hub `timeout`, see [Silent sensors](#silent-sensors-and-dead-batteries) |
 | `connectivity: true` | `Connectivity` binary sensor: OFF when the DVI sent nothing for the hub `timeout`, see [Silent sensors](#silent-sensors-and-dead-batteries) |
-| `lock_entity: true` | read-only `Handle` lock entity (combined state on double profiles), a workaround, see [below](#workaround-security-section-of-the-area-dashboard) |
+| `lock_entity: true` | read-only `Lock` lock entity (combined state on double profiles) shown instead of the binary sensor, a workaround, see [below](#workaround-security-section-of-the-area-dashboard) |
 
 Entity ids are `<id>_lock`, `<id>_tilted`, `<id>_rssi`, `<id>_state`, and
 `<id>_left_lock`, `<id>_right_lock`... for the double profiles. Customize any
@@ -138,10 +138,12 @@ and `camera` entities in its **Security** section. The `Lock` binary sensor
 (device class `lock`) shows in the global Security dashboard, but not there.
 
 As a workaround, `lock_entity: true` adds one read-only **lock** entity per
-opening (`Handle`), which the area dashboard picks up. It follows the handle
-like the binary sensor; on double profiles it has the combined state. The radio only receives, so the Lock / Unlock buttons Home
-Assistant shows can't work: commands are refused (logged as a warning) and the
-real state is published again. Prefer the binary sensor everywhere else.
+opening, also named `Lock`, which the area dashboard picks up. It replaces the
+binary sensor in the Security views (the binary sensor becomes diagnostic) and
+follows the handle the same way; on double profiles it has the combined state.
+The radio only receives, so the Lock / Unlock buttons Home Assistant shows
+can't work: commands are refused (logged as a warning) and the real state is
+published again. Without `lock_entity`, the binary sensor stays the one shown.
 
 The proper fix belongs in Home Assistant's frontend (list `binary_sensor` with
 device class `lock` in the area Security section, as the Security dashboard
@@ -176,7 +178,7 @@ sensor:
 lock:                       # read-only workaround, see above
   - platform: x3d_rfm69
     x3d_id: 0xEFCC85        # or a list: combined state
-    name: "Bathroom window handle"
+    name: "Bathroom window lock"
 ```
 
 Each X3D device can have at most one entity of each type. Every entity also
@@ -433,4 +435,12 @@ decoding, de-duplication, replay of real captures), with no hardware needed:
 
 ```sh
 make -C esphome/tests
+```
+
+[`tests/configs/profiles.yaml`](tests/configs/profiles.yaml) exercises every
+profile and option without hardware or secrets:
+
+```sh
+esphome config esphome/tests/configs/profiles.yaml
+esphome compile esphome/tests/configs/profiles.yaml
 ```

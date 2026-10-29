@@ -1,7 +1,8 @@
 # Window with one sash and one DVI.
 # Creates an HA device "${name}" with "Lock" ("Lock" is shown as
 # Locked / Unlocked).
-# Entity ids: ${id}_lock, ${id}_rssi, ${id}_state, ${id}_handle, ${id}_connectivity,
+# Entity ids: ${id}_lock, ${id}_rssi, ${id}_state, ${id}_lock_entity,
+# ${id}_connectivity,
 # ${id}_battery.
 #
 # vars:
@@ -10,7 +11,7 @@
 #   x3d_id: radio ID, as printed in the logs ("0xEFCC85")
 #   rssi:   true to add an "RSSI" sensor (default false)
 #   state:  true to add a "State" text sensor, locked / unlocked (default false)
-#   lock_entity: true to add a read-only "Handle" lock entity (default false),
+#   lock_entity: true to add a read-only "Lock" lock entity (default false),
 #           see the README: workaround so the opening shows in the Security
 #           section of HA's area dashboard
 #   battery: true to add a "Battery" sensor (default false): low when the
@@ -41,7 +42,7 @@ binary_sensor:
     name: "Lock"
     device_id: ${id}
     # Only one entity per opening in HA's Security views: this one, or the
-    # Handle lock when lock_entity is true.
+    # lock entity when lock_entity is true.
     entity_category: "${ 'diagnostic' if (lock_entity | string | lower) == 'true' else '' }"
   - platform: x3d_rfm69
     id: ${id}_connectivity
@@ -79,8 +80,8 @@ text_sensor:
 # HA's area dashboard only lists lock entities in its Security section.
 lock:
   - platform: x3d_rfm69
-    id: ${id}_handle
+    id: ${id}_lock_entity
     x3d_id: ${x3d_id}
-    name: "Handle"
+    name: "Lock"
     device_id: ${id}
     enabled: ${lock_entity}

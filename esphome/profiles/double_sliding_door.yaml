@@ -6,7 +6,7 @@
 # Entity ids: ${id}_lock, ${id}_left_lock, ${id}_right_lock,
 # ${id}_left_rssi, ${id}_right_rssi, ${id}_left_state, ${id}_right_state,
 # ${id}_left_connectivity, ${id}_right_connectivity, ${id}_left_battery,
-# ${id}_right_battery, ${id}_handle.
+# ${id}_right_battery, ${id}_lock_entity.
 #
 # vars:
 #   id:            unique id, used for the HA device and the entity ids
@@ -21,7 +21,7 @@
 #   battery:       true to add "Left battery" / "Right battery" (default
 #                  false): low when the suspected low battery flag is set, or
 #                  when the sash sent nothing for the hub `timeout`
-#   lock_entity:   true to add a read-only "Handle" lock entity with the
+#   lock_entity:   true to add a read-only "Lock" lock entity with the
 #                  combined state (default false), see the README: workaround
 #                  so the opening shows in the Security section of HA's area
 #                  dashboard
@@ -50,7 +50,7 @@ binary_sensor:
     name: "Lock"
     device_id: ${id}
     # Only one entity per opening in HA's Security views: this one, or the
-    # Handle lock when lock_entity is true.
+    # lock entity when lock_entity is true.
     entity_category: "${ 'diagnostic' if (lock_entity | string | lower) == 'true' else '' }"
   - platform: x3d_rfm69
     id: ${id}_left_lock
@@ -132,10 +132,10 @@ text_sensor:
 # entities in its Security section.
 lock:
   - platform: x3d_rfm69
-    id: ${id}_handle
+    id: ${id}_lock_entity
     x3d_id:
       - ${left_x3d_id}
       - ${right_x3d_id}
-    name: "Handle"
+    name: "Lock"
     device_id: ${id}
     enabled: ${lock_entity}

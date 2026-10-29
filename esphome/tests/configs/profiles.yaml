@@ -1,0 +1,52 @@
+# Validation / compile test for the profiles (no hardware, no secrets):
+#   esphome config esphome/tests/configs/profiles.yaml
+#   esphome compile esphome/tests/configs/profiles.yaml
+esphome:
+  name: x3d-test
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+external_components:
+  - source:
+      type: local
+      path: ../../components
+
+logger:
+
+spi:
+  clk_pin: GPIO18
+  miso_pin: GPIO19
+  mosi_pin: GPIO23
+
+x3d_rfm69:
+  cs_pin: GPIO5
+  dio0_pin: GPIO4
+  trace: [0xEFCC85]
+
+packages:
+  # double profile, workaround lock entity: only it in the Security views
+  living: !include
+    file: ../../profiles/double_sliding_door.yaml
+    vars: {id: living_door, name: "Living room door", left_x3d_id: "0xEFA00B", right_x3d_id: "0xEFACF4", lock_entity: true}
+  # double profile, defaults + diagnostics: the Lock binary sensor is shown
+  bedroom: !include
+    file: ../../profiles/double_window.yaml
+    vars: {id: bedroom_window, name: "Bedroom window", left_x3d_id: "0xEFA055", right_x3d_id: "0xEFCC75", connectivity: true, battery: true, rssi: true, state: true}
+  bathroom: !include
+    file: ../../profiles/tilt_window.yaml
+    vars: {id: bathroom_window, name: "Bathroom window", x3d_id: "0xEFCC85", lock_entity: true}
+  kitchen: !include
+    file: ../../profiles/window.yaml
+    vars: {id: kitchen_window, name: "Kitchen window", x3d_id: "0xEFA214"}
+
+binary_sensor:
+  - id: !extend kitchen_window_lock
+    icon: mdi:window-closed-variant
+
+text_sensor:
+  - platform: x3d_rfm69
+    type: last_frame
+    name: "Last X3D frame"
