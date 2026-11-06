@@ -12,3 +12,9 @@ low battery ?
 
 4.0V input
 13 ff 1a 00 2d a1 56 ef 0c 51 82 00 20 00 00 fd 1b 17 a4
+
+
+could these be low battery instead ?
+[09:04:30.056][I][x3d_rfm69.trace:396]: 0xEF56A1 decoded: announce (wake-up frame, no handle position) (window), bytes 8-9: 08 D0
+[09:04:30.067][I][x3d_rfm69.trace:345]: 0xEF56A1 repeat sensor message, msg 0x2A, -99.5 dBm: 13 ff 2a 00 2d a1 56 ef 08 d0 82 01 20 00 00 fc 9f 45 1a
+[09:04:30.085][I][x3d_rfm69.trace:345]: 0xEF56A1 repeat sensor message, msg 0x2A, -96.5 dBm: 13 ff 2a 00 2d a1 56 ef 08 d0 82 01 20 00 00 fc 9f 45 1a
