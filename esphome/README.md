@@ -376,29 +376,51 @@ x3d_rfm69:
   payload, stored big endian.
 - Header checksum: `0x10000 - sum(device id .. byte before checksum)`, big
   endian, checked as well.
-- Frame bytes 8-14 (full batteries), from captures of a tilt (soufflet)
-  window, a sliding door and a door:
+- Frame layout (normal frames, 13-byte header), e.g.
+  `13 ff 55 00 2d 85 cc ef 08 41 82 00 20 00 00 fc d5 75 49`:
 
-  | Device            | Locked                 | Unlocked               |
-  |-------------------|------------------------|------------------------|
-  | Tilt window       | `00 01 82 00 20 00 00` | `08 41 82 00 20 00 00` |
-  | Sliding door      | `00 01 82 00 40 00 00` | `04 41 82 00 40 00 00` |
-  | Door              | not captured yet       | `05 41 82 00 50 00 04` |
+  | Byte | Example | Meaning |
+  |---|---|---|
+  | 0 | `13` | length, including this byte and the CRC |
+  | 1 | `ff` | constant |
+  | 2 | `55` | message number, new for each event |
+  | 3 | `00` | message type: sensor |
+  | 4 | `2d` | flags `0x20` (no response required) + header length `0x0d` |
+  | 5-7 | `85 cc ef` | device ID, little endian: `0xEFCC85` |
+  | 8 | `08` | handle position when unlocked |
+  | 9 | `41` | state |
+  | 10-11 | `82 00` | constant so far (`82 01` once with state bit `0x80`) |
+  | 12 | `20` | kind |
+  | 13-14 | `00 00` | `00 00` so far (`00 04` on an uncalibrated door) |
+  | 15-16 | `fc d5` | header checksum, big endian |
+  | 17-18 | `75 49` | CRC, big endian |
+
+- Bytes 8-14 per opening, from the captures in
+  [`tests/captures.md`](tests/captures.md):
+
+  | Opening | Locked | Unlocked |
+  |---|---|---|
+  | Tilt-only window (soufflet) | `00 01 82 00 20 00 00` | `08 41 82 00 20 00 00` (tilt) |
+  | Tilt-and-turn window | `00 01 82 00 20 00 00` | `08 41 82 00 20 00 00` (tilt), `0c 41 82 00 20 00 00` (turn) |
+  | Sliding door | `00 01 82 00 40 00 00` | `04 41 82 00 40 00 00` |
+  | Door | not captured yet | `05 41 82 00 50 00 04` (before calibration) |
 
   State comes from byte 9: bit `0x40` = unlocked, `0x01` = locked, `0x00` =
   "not changed" (entities keep their value). Bit `0x10` (`0x11` / `0x51`) was
   seen on a window fed from a bench supply after low-voltage tests, until a
-  power cycle; its meaning is unknown. Byte 8 is the handle position when
-  unlocked. On a tilt-and-turn window: `0x08` handle up (tilt, Tydom's
-  `OPEN_HOPPER`), `0x0c` handle horizontal (turn, `OPEN_FRENCH`), `0x00`
-  locked. A tilt-only (soufflet) window sends `0x08` too; sliding doors send
-  `0x04`. The DVI reads reed switches closed by a magnet on the locking
+  power cycle; its meaning is unknown, like bit `0x80` (seen once in `0xd0`,
+  with byte 11 = `0x01`).
+
+  Byte 8 is the handle position when unlocked: `0x08` handle up (tilt, Tydom's
+  `OPEN_HOPPER`), `0x0c` handle horizontal (turn, `OPEN_FRENCH`), `0x04` on
+  sliding doors. The DVI reads reed switches closed by a magnet on the locking
   hardware: it reports the handle position, and moving the sash afterwards
-  sends nothing. Byte 12 gives
-  the `kind`: `0x20` window, `0x40` sliding, `0x50` door, matching Tydom's
-  `windowFrench` / `windowSliding` / door device types. On the door, byte 8 bit
-  `0x01` and byte 14 `0x04` are not understood yet (see the activation notes
-  below, they may be a test mode).
+  sends nothing.
+
+  Byte 12 gives the `kind`: `0x20` window, `0x40` sliding, `0x50` door,
+  matching Tydom's `windowFrench` / `windowSliding` / door device types. On the
+  door, byte 8 bit `0x01` and byte 14 `0x04` are not understood yet (see the
+  calibration note below).
 - Each event is sent 3 times ~20 ms apart, then the same burst again
   ~3.5-5.3 s later. Both are dropped by message number for 30 s.
 - Values in bytes 8-14 that don't match the table (possibly battery low,
