@@ -18,3 +18,46 @@ could these be low battery instead ?
 [09:04:30.056][I][x3d_rfm69.trace:396]: 0xEF56A1 decoded: announce (wake-up frame, no handle position) (window), bytes 8-9: 08 D0
 [09:04:30.067][I][x3d_rfm69.trace:345]: 0xEF56A1 repeat sensor message, msg 0x2A, -99.5 dBm: 13 ff 2a 00 2d a1 56 ef 08 d0 82 01 20 00 00 fc 9f 45 1a
 [09:04:30.085][I][x3d_rfm69.trace:345]: 0xEF56A1 repeat sensor message, msg 0x2A, -96.5 dBm: 13 ff 2a 00 2d a1 56 ef 08 d0 82 01 20 00 00 fc 9f 45 1a
+
+
+frames at 4.0V
+[09:30:16.597][I][x3d_rfm69.trace:345]: 0xEF56A1 new sensor message, msg 0x37, -102.5 dBm: 13 ff 37 00 2d a1 56 ef 00 11 82 00 20 00 00 fd 67 64 60
+[09:30:17.775][I][x3d_rfm69.trace:396]: 0xEF56A1 decoded: locked (window), bytes 8-9: 00 11
+[09:30:17.775][I][x3d_rfm69.trace:345]: 0xEF56A1 repeat sensor message, msg 0x37, -100.0 dBm: 13 ff 37 00 2d a1 56 ef 00 11 82 00 20 00 00 fd 67 64 60
+[09:30:17.776][I][x3d_rfm69.trace:345]: 0xEF56A1 repeat sensor message, msg 0x37, -104.0 dBm: 13 ff 37 00 2d a1 56 ef 00 11 82 00 20 00 00 fd 67 64 60
+[09:30:17.776][S][binary_sensor]: 'Lock' >> OFF
+[09:30:17.777][S][binary_sensor]: 'Tilted' >> OFF
+[09:30:17.777][S][sensor]: 'RSSI' >> -102.5 dBm
+[09:30:17.778][S][text_sensor]: 'last X3D frame' >> '0xEF56A1 'Fenêtre SDB 2': locked (window, -102.5 dBm)'
+[09:30:17.779][I][x3d_rfm69.trace:345]: 0xEF56A1 new sensor message, msg 0x38, -102.5 dBm: 13 ff 38 00 2d a1 56 ef 08 51 82 00 20 00 00 fd 1f 1b 02
+[09:30:17.779][I][x3d_rfm69.trace:396]: 0xEF56A1 decoded: unlocked (tilt) (window), bytes 8-9: 08 51
+[09:30:17.780][I][x3d_rfm69.trace:345]: 0xEF56A1 repeat sensor message, msg 0x38, -100.0 dBm: 13 ff 38 00 2d a1 56 ef 08 51 82 00 20 00 00 fd 1f 1b 02
+[09:30:17.780][I][x3d_rfm69.trace:345]: 0xEF56A1 repeat sensor message, msg 0x38, -98.0 dBm: 13 ff 38 00 2d a1 56 ef 08 51 82 00 20 00 00 fd 1f 1b 02
+[09:30:17.781][S][binary_sensor]: 'Lock' >> ON
+[09:30:17.781][S][binary_sensor]: 'Tilted' >> ON
+[09:30:17.782][S][sensor]: 'RSSI' >> -102.5 dBm
+[09:30:17.783][S][text_sensor]: 'last X3D frame' >> '0xEF56A1 'Fenêtre SDB 2': unlocked (tilt) (window, -102.5 dBm)'
+[09:30:21.802][I][x3d_rfm69.trace:345]: 0xEF56A1 repeat sensor message, msg 0x38, -99.5 dBm: 13 ff 38 00 2d a1 56 ef 08 51 82 00 20 00 00 fd 1f 1b 02
+[09:30:21.818][I][x3d_rfm69.trace:345]: 0xEF56A1 repeat sensor message, msg 0x38, -99.5 dBm: 13 ff 38 00 2d a1 56 ef 08 51 82 00 20 00 00 fd 1f 1b 02
+[09:30:21.837][I][x3d_rfm69.trace:345]: 0xEF56A1 repeat sensor message, msg 0x38, -104.5 dBm: 13 ff 38 00 2d a1 56 ef 08 51 82 00 20 00 00 fd 1f 1b 02
+
+frames at 6V
+[09:31:14.894][I][x3d_rfm69.trace:345]: 0xEF56A1 new sensor message, msg 0x39, -102.5 dBm: 13 ff 39 00 2d a1 56 ef 00 11 82 00 20 00 00 fd 67 95 4e
+[09:31:14.898][I][x3d_rfm69.trace:396]: 0xEF56A1 decoded: locked (window), bytes 8-9: 00 11
+[09:31:14.908][I][x3d_rfm69.trace:345]: 0xEF56A1 repeat sensor message, msg 0x39, -101.0 dBm: 13 ff 39 00 2d a1 56 ef 00 11 82 00 20 00 00 fd 67 95 4e
+[09:31:14.926][I][x3d_rfm69.trace:345]: 0xEF56A1 repeat sensor message, msg 0x39, -100.0 dBm: 13 ff 39 00 2d a1 56 ef 00 11 82 00 20 00 00 fd 67 95 4e
+[09:31:14.997][S][binary_sensor]: 'Lock' >> OFF
+[09:31:14.998][S][binary_sensor]: 'Tilted' >> OFF
+[09:31:14.999][S][sensor]: 'RSSI' >> -102.5 dBm
+[09:31:15.000][S][text_sensor]: 'last X3D frame' >> '0xEF56A1 'Fenêtre SDB 2': locked (window, -102.5 dBm)'
+[09:31:15.642][I][x3d_rfm69.trace:345]: 0xEF56A1 new sensor message, msg 0x3A, -104.0 dBm: 13 ff 3a 00 2d a1 56 ef 08 51 82 00 20 00 00 fd 1f 56 db
+[09:31:15.649][I][x3d_rfm69.trace:396]: 0xEF56A1 decoded: unlocked (tilt) (window), bytes 8-9: 08 51
+[09:31:15.657][I][x3d_rfm69.trace:345]: 0xEF56A1 repeat sensor message, msg 0x3A, -97.0 dBm: 13 ff 3a 00 2d a1 56 ef 08 51 82 00 20 00 00 fd 1f 56 db
+[09:31:15.675][I][x3d_rfm69.trace:345]: 0xEF56A1 repeat sensor message, msg 0x3A, -100.5 dBm: 13 ff 3a 00 2d a1 56 ef 08 51 82 00 20 00 00 fd 1f 56 db
+[09:31:15.745][S][binary_sensor]: 'Lock' >> ON
+[09:31:15.747][S][binary_sensor]: 'Tilted' >> ON
+[09:31:15.747][S][sensor]: 'RSSI' >> -104.0 dBm
+[09:31:15.748][S][text_sensor]: 'last X3D frame' >> '0xEF56A1 'Fenêtre SDB 2': unlocked (tilt) (window, -104.0 dBm)'
+[09:31:20.643][I][x3d_rfm69.trace:345]: 0xEF56A1 repeat sensor message, msg 0x3A, -103.0 dBm: 13 ff 3a 00 2d a1 56 ef 08 51 82 00 20 00 00 fd 1f 56 db
+[09:31:20.659][I][x3d_rfm69.trace:345]: 0xEF56A1 repeat sensor message, msg 0x3A, -102.0 dBm: 13 ff 3a 00 2d a1 56 ef 08 51 82 00 20 00 00 fd 1f 56 db
+[09:31:20.677][I][x3d_rfm69.trace:345]: 0xEF56A1 repeat sensor message, msg 0x3A, -99.5 dBm: 13 ff 3a 00 2d a1 56 ef 08 51 82 00 20 00 00 fd 1f 56 db
