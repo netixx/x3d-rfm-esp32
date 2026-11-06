@@ -23,7 +23,7 @@ struct Capture {
   uint8_t frame[19];
 };
 
-// x3d-raw-monitor/captures.txt: soufflet window 0xEFCC85 unlocked, locked,
+// captures.md, "Soufflet window and sliding door": soufflet window 0xEFCC85 unlocked, locked,
 // unlocked; then sliding door 0xEFA00B locked, unlocked, locked. Each event is
 // 3 repeats, then the same 3 repeats again ~3.5-5.3 s later.
 static const Capture CAPTURES[] = {
@@ -200,7 +200,7 @@ static void test_msb_misread_frame() {
   CHECK(std::strcmp(sensor_kind_to_string(f), "sliding") == 0);
 }
 
-// Field report (esphome/tests/unsupported_frames.txt): door 0xEFA214, about
+// captures.md, "Door before calibration": door 0xEFA214, about
 // one frame per second after activation with a magnet.
 static void test_door_frame() {
   static const uint8_t DOOR[] = {0x13, 0xff, 0x1a, 0x00, 0x2d, 0x14, 0xa2, 0xef, 0x05, 0x41,
@@ -230,7 +230,7 @@ static void test_announce_frame() {
   CHECK(std::strcmp(sensor_kind_to_string(f), "sliding") == 0);
 }
 
-// esphome/more logs.txt: window 0xEF56A1 (tilt-and-turn) on a bench supply.
+// captures.md, "Tilt-and-turn window": window 0xEF56A1.
 // State byte bit 0x10: meaning unknown (seen after low-voltage tests).
 // Byte 8: 0x00 locked, 0x08 tilt, 0x0c turn.
 static void test_tilt_turn_window() {

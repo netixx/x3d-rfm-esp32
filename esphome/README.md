@@ -426,8 +426,7 @@ x3d_rfm69:
   - a door sent its state about once per second, with a new message number
     each time, for at least 10 s (instead of the usual 3 + 3 repeats).
 
-  Raw captures: [`tests/unsupported_frames.txt`](tests/unsupported_frames.txt),
-  [`more logs.txt`](more%20logs.txt).
+  Captures: [`tests/captures.md`](tests/captures.md).
 - **Door DVI calibration.** Doors use a different DVI (no reed switch, no
   magnet). Per the K•LINE POD installation manual (page 9), a door DVI must be
   recalibrated as soon as it has been removed from the frame (*dormant*): put
@@ -439,6 +438,9 @@ x3d_rfm69:
   confirmed yet.
 
 ## Tests
+
+All frames captured so far, with the conditions they were captured in, are in
+[`tests/captures.md`](tests/captures.md).
 
 Host-side unit tests for the parser (CRC, header checksum, state and tilt
 decoding, de-duplication, replay of real captures), with no hardware needed:
