@@ -1,0 +1,14 @@
+more logs
+
+locked for reference:
+13 ff 07 00 2d a1 56 ef 00 11 82 00 20 00 00 fd 67 b7 fe
+low battery ?
+13 ff 06 00 2d a1 56 ef 08 51 82 00 20 00 00 fd 1f 39 b2
+13 ff 07 00 2d a1 56 ef 00 11 82 00 20 00 00 fd 67 b7 fe
+
+3.2V input (instead of 2x CR2032 in series) - 3.2V seems to be the lowest reliable voltage
+16 ff 00 00 10 a1 56 ef 00 11 82 00 00 20 00 00 c6 79 fc 28 26 49
+
+
+4.0V input
+13 ff 1a 00 2d a1 56 ef 0c 51 82 00 20 00 00 fd 1b 17 a4
