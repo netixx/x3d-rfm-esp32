@@ -15,8 +15,7 @@
 #           see the README: workaround so the opening shows in the Security
 #           section of HA's area dashboard
 #   battery: true to add a "Battery" sensor (default false): low when the
-#           suspected low battery flag is set, or when the DVI sent nothing
-#           for the hub `timeout`
+#           DVI sent nothing for the hub `timeout` (battery dead?)
 #   connectivity: true to add a "Connectivity" sensor (default false), OFF
 #           when the DVI sent nothing for the hub `timeout` (battery dead?)
 #

@@ -45,8 +45,8 @@ CONFIG_SCHEMA = cv.typed_schema(
         TYPE_TILT: binary_sensor.binary_sensor_schema(
             icon="mdi:window-open-variant",
         ).extend(X3D_ENTITY_SCHEMA),
-        # Battery class, ON = low: suspected low battery flag (byte 8 bit 0x10,
-        # unconfirmed) or silent for longer than the hub `timeout`.
+        # Battery class, ON = low: silent for longer than the hub `timeout`
+        # (no low battery flag is known in the frames).
         TYPE_BATTERY: binary_sensor.binary_sensor_schema(
             device_class=DEVICE_CLASS_BATTERY,
             entity_category=ENTITY_CATEGORY_DIAGNOSTIC,

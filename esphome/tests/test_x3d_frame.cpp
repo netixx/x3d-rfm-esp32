@@ -226,17 +226,70 @@ static void test_announce_frame() {
   CHECK(!is_tilted(f));
   CHECK(!has_unexpected_bits(f));
   CHECK(std::strcmp(handle_state_to_string(f.state), "announce") == 0);
+  CHECK(is_power_on_frame(f));
+  CHECK(std::strcmp(sensor_kind_to_string(f), "sliding") == 0);
 }
 
-static void test_battery_flag() {
+// esphome/more logs.txt: window 0xEF56A1 (tilt-and-turn) on a bench supply.
+// State byte bit 0x10: meaning unknown (seen after low-voltage tests).
+// Byte 8: 0x00 locked, 0x08 tilt, 0x0c turn.
+static void test_tilt_turn_window() {
+  static const uint8_t LOCKED_LOW[] = {0x13, 0xff, 0x07, 0x00, 0x2d, 0xa1, 0x56, 0xef, 0x00, 0x11,
+                                       0x82, 0x00, 0x20, 0x00, 0x00, 0xfd, 0x67, 0xb7, 0xfe};
+  static const uint8_t TILT_LOW[] = {0x13, 0xff, 0x06, 0x00, 0x2d, 0xa1, 0x56, 0xef, 0x08, 0x51,
+                                     0x82, 0x00, 0x20, 0x00, 0x00, 0xfd, 0x1f, 0x39, 0xb2};
+  // Handle horizontal (turn position).
+  static const uint8_t TURN_LOW[] = {0x13, 0xff, 0x1a, 0x00, 0x2d, 0xa1, 0x56, 0xef, 0x0c, 0x51,
+                                     0x82, 0x00, 0x20, 0x00, 0x00, 0xfd, 0x1b, 0x17, 0xa4};
+  // 0x80 with a position (0xD0 = 0x80 | unlocked | 0x10), byte 11 = 0x01.
+  static const uint8_t TILT_0X80[] = {0x13, 0xff, 0x2a, 0x00, 0x2d, 0xa1, 0x56, 0xef, 0x08, 0xd0,
+                                      0x82, 0x01, 0x20, 0x00, 0x00, 0xfc, 0x9f, 0x45, 0x1a};
   SensorFrame f{};
-  CHECK(parse_sensor_frame(CAPTURES[0].frame, 19, &f) == ParseResult::OK);
-  CHECK(!is_battery_low(f));
-  f.flags |= DVI_FLAG_BATTERY_LOW;
-  CHECK(is_battery_low(f));
-  CHECK(has_unexpected_bits(f));  // still reported until confirmed
-  f.state = HandleState::ANNOUNCE;
-  CHECK(!is_battery_low(f));
+  CHECK(parse_sensor_frame(LOCKED_LOW, sizeof(LOCKED_LOW), &f) == ParseResult::OK);
+  CHECK(f.device_id == 0xEF56A1);
+  CHECK(f.state == HandleState::LOCKED);
+  CHECK(!is_power_on_frame(f));
+  CHECK(!has_unexpected_bits(f));
+
+  CHECK(parse_sensor_frame(TILT_LOW, sizeof(TILT_LOW), &f) == ParseResult::OK);
+  CHECK(f.state == HandleState::UNLOCKED);
+  CHECK(is_tilted(f));
+  CHECK(!has_unexpected_bits(f));
+
+  CHECK(parse_sensor_frame(TURN_LOW, sizeof(TURN_LOW), &f) == ParseResult::OK);
+  CHECK(f.state == HandleState::UNLOCKED);
+  CHECK(is_turned(f));
+  CHECK(!is_tilted(f));
+  CHECK(!has_unexpected_bits(f));
+
+  // 0x80 must not hide the handle position.
+  CHECK(parse_sensor_frame(TILT_0X80, sizeof(TILT_0X80), &f) == ParseResult::OK);
+  CHECK(f.state == HandleState::UNLOCKED);
+  CHECK(is_tilted(f));
+  CHECK(has_unexpected_bits(f));  // 0x80 and byte 11 = 0x01 not understood yet
+
+}
+
+// Power-on frame (16-byte header, msg 0x00) with a real state: locked (+ 0x10).
+static void test_power_on_frame() {
+  static const uint8_t BOOT[] = {0x16, 0xff, 0x00, 0x00, 0x10, 0xa1, 0x56, 0xef, 0x00, 0x11, 0x82,
+                                 0x00, 0x00, 0x20, 0x00, 0x00, 0xc6, 0x79, 0xfc, 0x28, 0x26, 0x49};
+  SensorFrame f{};
+  CHECK(parse_sensor_frame(BOOT, sizeof(BOOT), &f) == ParseResult::OK);
+  CHECK(f.device_id == 0xEF56A1);
+  CHECK(is_power_on_frame(f));
+  CHECK(f.state == HandleState::LOCKED);
+  CHECK(std::strcmp(sensor_kind_to_string(f), "window") == 0);
+  CHECK(!has_unexpected_bits(f));
+
+  // Batteries inserted with the window open in turn position.
+  static const uint8_t BOOT_TURN[] = {0x16, 0xff, 0x00, 0x00, 0x10, 0xa1, 0x56, 0xef, 0x0c, 0x41, 0x82,
+                                      0x00, 0x00, 0x20, 0x00, 0x00, 0xc6, 0x79, 0xfb, 0xec, 0x21, 0x82};
+  CHECK(parse_sensor_frame(BOOT_TURN, sizeof(BOOT_TURN), &f) == ParseResult::OK);
+  CHECK(is_power_on_frame(f));
+  CHECK(f.state == HandleState::UNLOCKED);
+  CHECK(is_turned(f));
+  CHECK(!is_tilted(f));
 }
 
 static void test_handle_combiner() {
@@ -332,7 +385,8 @@ int main() {
   test_msb_misread_frame();
   test_door_frame();
   test_announce_frame();
-  test_battery_flag();
+  test_tilt_turn_window();
+  test_power_on_frame();
   test_handle_combiner();
   test_decode_state();
   test_replay_capture();

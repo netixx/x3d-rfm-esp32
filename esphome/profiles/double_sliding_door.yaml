@@ -19,8 +19,8 @@
 #                  (default false), OFF when a sash sent nothing for the hub
 #                  `timeout` (battery dead?)
 #   battery:       true to add "Left battery" / "Right battery" (default
-#                  false): low when the suspected low battery flag is set, or
-#                  when the sash sent nothing for the hub `timeout`
+#                  false): low when the sash sent nothing for the hub
+#                  `timeout` (battery dead?)
 #   lock_entity:   true to add a read-only "Lock" lock entity with the
 #                  combined state (default false), see the README: workaround
 #                  so the opening shows in the Security section of HA's area

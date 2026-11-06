@@ -84,9 +84,6 @@ class X3DOpening {
   /// Handle event (sensor message).
   void publish(const SensorFrame &frame, float rssi) {
     this->heard_(!has_handle_position(frame.state));
-    // Battery class: ON = low. Suspected flag, or silence (see check_timeout).
-    if (this->battery_ != nullptr && frame.state != HandleState::ANNOUNCE)
-      this->battery_->publish_state(is_battery_low(frame));
     if (has_handle_position(frame.state)) {
       const bool tilted = is_tilted(frame);
       this->publish_handle_(frame.state, tilted);
@@ -148,6 +145,10 @@ class X3DOpening {
     this->last_seen_ms_ = millis();
     if (this->connectivity_ != nullptr)
       this->connectivity_->publish_state(true);
+    // No known low battery flag in the frames: the battery entity only reports
+    // silence (see check_timeout).
+    if (this->battery_ != nullptr)
+      this->battery_->publish_state(false);
     if (this->timed_out_) {
       this->timed_out_ = false;
       if (republish_last && has_handle_position(this->last_state_))

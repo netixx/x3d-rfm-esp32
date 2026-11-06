@@ -96,12 +96,13 @@ ParseResult parse_sensor_frame(const uint8_t *buf, size_t buf_len, SensorFrame *
 }
 
 HandleState decode_handle_state(uint8_t state_byte) {
-  if (state_byte & DVI_STATE_ANNOUNCE_BIT)
-    return HandleState::ANNOUNCE;
+  // A position bit wins over 0x80, seen together in 0xD0.
   if (state_byte & DVI_STATE_UNLOCKED_BIT)
     return HandleState::UNLOCKED;
   if (state_byte & DVI_STATE_VALID_BIT)
     return HandleState::LOCKED;
+  if (state_byte & DVI_STATE_ANNOUNCE_BIT)
+    return HandleState::ANNOUNCE;
   return HandleState::UNCHANGED;
 }
 
@@ -119,21 +120,30 @@ const char *handle_state_to_string(HandleState state) {
 }
 
 bool is_tilted(const SensorFrame &frame) {
-  return frame.state == HandleState::UNLOCKED && (frame.flags & DVI_FLAG_TILT) != 0;
+  return frame.state == HandleState::UNLOCKED && (frame.flags & DVI_POSITION_MASK) == DVI_POSITION_TILT;
 }
 
-bool is_battery_low(const SensorFrame &frame) {
-  return frame.state != HandleState::ANNOUNCE && (frame.flags & DVI_FLAG_BATTERY_LOW) != 0;
+bool is_turned(const SensorFrame &frame) {
+  return frame.state == HandleState::UNLOCKED && (frame.flags & DVI_POSITION_MASK) == DVI_POSITION_TURN;
 }
+
+// Normal frames carry 5 extra bytes (82 00 KK 00 00), power-on frames 8
+// (82 0x 0x KK 00 00 RR RR).
+bool is_power_on_frame(const SensorFrame &frame) { return frame.extra_len == 8; }
 
 const char *sensor_kind_to_string(const SensorFrame &frame) {
-  if (frame.extra_len >= 3) {
-    if (frame.extra[2] == 0x20)
-      return "window";
-    if (frame.extra[2] == 0x40)
-      return "sliding";
-    if (frame.extra[2] == 0x50)
-      return "door";
+  const size_t kind_idx = is_power_on_frame(frame) ? 3 : 2;
+  if (frame.extra_len > kind_idx) {
+    switch (frame.extra[kind_idx]) {
+      case 0x20:
+        return "window";
+      case 0x40:
+        return "sliding";
+      case 0x50:
+        return "door";
+      default:
+        break;
+    }
   }
   return "other";
 }
@@ -175,13 +185,15 @@ const char *parse_result_to_string(ParseResult result) {
 }
 
 bool has_unexpected_bits(const SensorFrame &frame) {
-  // Announce frames have their own, longer layout; not decoded yet.
-  if (frame.state == HandleState::ANNOUNCE)
+  // Power-on frames have their own, longer layout, not fully decoded yet.
+  if (is_power_on_frame(frame) || frame.state == HandleState::ANNOUNCE)
     return false;
-  if (frame.flags != 0x00 && frame.flags != 0x04 && frame.flags != 0x08)
+  if (frame.flags != 0x00 && frame.flags != 0x04 && frame.flags != DVI_POSITION_TILT &&
+      frame.flags != DVI_POSITION_TURN)
     return true;
-  if (frame.state_byte != 0x00 && frame.state_byte != DVI_STATE_VALID_BIT &&
-      frame.state_byte != (DVI_STATE_VALID_BIT | DVI_STATE_UNLOCKED_BIT))
+  // 0x10 seen and reported already (meaning unknown): not warned about again.
+  const uint8_t state = frame.state_byte & ~DVI_STATE_UNKNOWN_0X10;
+  if (state != 0x00 && state != DVI_STATE_VALID_BIT && state != (DVI_STATE_VALID_BIT | DVI_STATE_UNLOCKED_BIT))
     return true;
   if (frame.extra_len != sizeof(KNOWN_EXTRA[0]))
     return true;

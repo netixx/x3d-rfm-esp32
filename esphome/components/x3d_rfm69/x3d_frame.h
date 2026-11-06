@@ -15,23 +15,26 @@ static constexpr size_t X3D_MAX_FRAME_LEN = 65;  // length byte + 64 byte payloa
 // handle: it reports locked / unlocked, not open / closed.
 static constexpr uint8_t DVI_STATE_UNLOCKED_BIT = 0x40;
 static constexpr uint8_t DVI_STATE_VALID_BIT = 0x01;
-// State byte 0x80: wake-up / announce frame (16-byte header, flags 0x00), seen
-// when a DVI is activated with a magnet. Carries no handle position.
+// State byte bit 0x10: meaning unknown (0x11 / 0x51). Seen on a window fed
+// from a bench supply after low-voltage tests, until a power cycle; not
+// enough to call it battery low.
+static constexpr uint8_t DVI_STATE_UNKNOWN_0X10 = 0x10;
+// State byte bit 0x80: meaning unknown. Alone (0x80) it carries no handle
+// position (seen in a power-on frame); it was also seen with a position
+// (0xD0 = 0x80 | unlocked | 0x10, with byte 11 = 0x01).
 static constexpr uint8_t DVI_STATE_ANNOUNCE_BIT = 0x80;
-// Flags byte (idx 8) when unlocked: 0x08 on a tilt-only (soufflet) window,
-// 0x04 on a sliding door. Read as Tydom's OPEN_HOPPER (tilt) vs UNLOCKED.
-// Not yet checked on a tilt-and-turn window.
-static constexpr uint8_t DVI_FLAG_TILT = 0x08;
-// Suspected low battery bit in byte 8 (unconfirmed): same flags byte as the
-// first payload byte of standard messages, where 0x10 is "battery low"
-// (X3D-Protocol.md), and the door sends 0x05 there like their `05 98` header.
-static constexpr uint8_t DVI_FLAG_BATTERY_LOW = 0x10;
+// Byte 8 = handle position when unlocked, from a tilt-and-turn window:
+// 0x08 tilt (as on tilt-only "soufflet" windows), 0x0c turn (handle
+// horizontal). 0x04 alone on sliding doors, 0x05 on a door.
+static constexpr uint8_t DVI_POSITION_MASK = 0x0c;
+static constexpr uint8_t DVI_POSITION_TILT = 0x08;
+static constexpr uint8_t DVI_POSITION_TURN = 0x0c;
 
 enum class HandleState : uint8_t {
   UNCHANGED = 0,  // "state not changed" message (state byte 0x00), maybe a heartbeat
   LOCKED,
   UNLOCKED,
-  ANNOUNCE,  // wake-up / announce frame (state byte 0x80), no handle position
+  ANNOUNCE,  // power-on frame without handle position (state byte 0x80)
 };
 
 /// LOCKED or UNLOCKED: the frame says where the handle is.
@@ -87,12 +90,18 @@ HandleState decode_handle_state(uint8_t state_byte);
 
 const char *handle_state_to_string(HandleState state);
 
-/// Handle in tilt position (unlocked with the tilt flag).
+/// Handle in tilt position (byte 8 = 0x08).
 bool is_tilted(const SensorFrame &frame);
 
-/// Suspected low battery flag (byte 8 bit 0x10, unconfirmed). Never set on
-/// announce frames, which have another layout.
-bool is_battery_low(const SensorFrame &frame);
+/// Handle in turn position (byte 8 = 0x0c, tilt-and-turn windows).
+bool is_turned(const SensorFrame &frame);
+
+/// Power-on frame: 16-byte header (13 normally), message number 0x00, sent
+/// when the DVI starts (batteries inserted, magnet wake-up, brown-out). Its
+/// state byte is valid (or 0x80) and the sensor kind is one byte later. The
+/// header ends with the encrypted message id (X3D message id encryption, see
+/// github.com/psolyca/X2D-X3D), which decrypts to 2 on the two devices seen.
+bool is_power_on_frame(const SensorFrame &frame);
 
 /// Sensor kind from byte 12: 0x20 on a tilt (soufflet) window, 0x40 on a
 /// sliding door, 0x50 on a door. Same split as Tydom's windowFrench /
@@ -101,7 +110,7 @@ const char *sensor_kind_to_string(const SensorFrame &frame);
 const char *parse_result_to_string(ParseResult result);
 
 /// True when bytes 8-14 differ from every value captured so far
-/// (candidate for battery low, tamper, ...).
+/// (candidates: battery low, tamper, ...).
 bool has_unexpected_bits(const SensorFrame &frame);
 
 /// Combined handle state of several sashes (one window or door): UNLOCKED as

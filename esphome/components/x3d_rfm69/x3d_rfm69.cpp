@@ -384,13 +384,18 @@ void X3DRFM69::handle_frame_(const uint8_t *buf, size_t len, float rssi) {
   }
 
   const char *state_str = handle_state_to_string(frame.state);
-  // For logs and last_frame only: the tilt position is shown next to the state.
-  const char *shown_str = state_str;
+  // For logs and last_frame only: state with tilt, power-on frame and battery.
+  const char *base_str = state_str;
   if (is_tilted(frame)) {
-    shown_str = "unlocked (tilt)";
+    base_str = "unlocked (tilt)";
+  } else if (is_turned(frame)) {
+    base_str = "unlocked (turn)";
   } else if (frame.state == HandleState::ANNOUNCE) {
-    shown_str = "announce (wake-up frame, no handle position)";
+    base_str = "no handle position";
   }
+  char shown_buf[64];
+  snprintf(shown_buf, sizeof(shown_buf), "%s%s", base_str, is_power_on_frame(frame) ? ", power-on frame" : "");
+  const char *shown_str = shown_buf;
   const char *kind_str = sensor_kind_to_string(frame);
   if (traced) {
     ESP_LOGI(TRACE_TAG, "0x%s decoded: %s (%s), bytes 8-9: %02X %02X", id_str, shown_str, kind_str, frame.flags,

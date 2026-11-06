@@ -115,7 +115,7 @@ Optional vars, on every profile:
 |---------|----------------------------------------------------|
 | `rssi: true`  | `RSSI` sensor in dBm, updated on every frame: acts as "last seen" |
 | `state: true` | `State` text sensor: `locked` / `unlocked`  |
-| `battery: true` | `Battery` binary sensor (low = ON): suspected low battery flag, or silent past the hub `timeout`, see [Silent sensors](#silent-sensors-and-dead-batteries) |
+| `battery: true` | `Battery` binary sensor (low = ON): silent past the hub `timeout`, see [Silent sensors](#silent-sensors-and-dead-batteries) |
 | `connectivity: true` | `Connectivity` binary sensor: OFF when the DVI sent nothing for the hub `timeout`, see [Silent sensors](#silent-sensors-and-dead-batteries) |
 | `lock_entity: true` | read-only `Lock` lock entity (combined state on double profiles) shown instead of the binary sensor, a workaround, see [below](#workaround-security-section-of-the-area-dashboard) |
 
@@ -308,14 +308,11 @@ publishes the last known position again. The `connectivity` entity (profile var
 sensor you can alert on.
 
 The `battery` entity (profile var `battery: true`, or `type: battery`, Home
-Assistant's battery class: ON = low) turns on when a frame carries the
-suspected low battery flag, or when the device went silent past the
-`timeout`. The flag is a guess: standard X3D messages use bit `0x10` of their
-first payload byte for "battery low" ([X3D-Protocol.md](../X3D-Protocol.md)),
-and the DVI's byte 8 looks like the same flags byte (the door sends `05`
-there, like their `05 98` header), so a low DVI should send `1x` in byte 8.
-Not seen yet: frames with that bit are still reported with a warning, please
-send them.
+Assistant's battery class: ON = low) turns on when the device went silent past
+the `timeout`, and off again with its next frame. No low battery flag is known
+in the frames yet: bench tests with a supply instead of the 2x CR2032 (6 V)
+didn't give a clear signal (see the state byte bit `0x10` in the decoding
+notes).
 
 The timeout defaults to **6 h**. How often a DVI sends a heartbeat when nothing
 happens isn't known yet (Tydom shows a `supervisionMode` setting, `SHORT` /
@@ -379,8 +376,8 @@ x3d_rfm69:
   payload, stored big endian.
 - Header checksum: `0x10000 - sum(device id .. byte before checksum)`, big
   endian, checked as well.
-- Frame bytes 8-14, from captures of a tilt (soufflet) window, a sliding door
-  and a door:
+- Frame bytes 8-14 (full batteries), from captures of a tilt (soufflet)
+  window, a sliding door and a door:
 
   | Device            | Locked                 | Unlocked               |
   |-------------------|------------------------|------------------------|
@@ -389,35 +386,48 @@ x3d_rfm69:
   | Door              | not captured yet       | `05 41 82 00 50 00 04` |
 
   State comes from byte 9: bit `0x40` = unlocked, `0x01` = locked, `0x00` =
-  "not changed" (entities keep their value). Byte 8 bit `0x08` is read as the
-  tilt position (Tydom's `OPEN_HOPPER`), `0x04` as a plain unlock. Byte 12 gives
+  "not changed" (entities keep their value). Bit `0x10` (`0x11` / `0x51`) was
+  seen on a window fed from a bench supply after low-voltage tests, until a
+  power cycle; its meaning is unknown. Byte 8 is the handle position when
+  unlocked. On a tilt-and-turn window: `0x08` handle up (tilt, Tydom's
+  `OPEN_HOPPER`), `0x0c` handle horizontal (turn, `OPEN_FRENCH`), `0x00`
+  locked. A tilt-only (soufflet) window sends `0x08` too; sliding doors send
+  `0x04`. The DVI reads reed switches closed by a magnet on the locking
+  hardware: it reports the handle position, and moving the sash afterwards
+  sends nothing. Byte 12 gives
   the `kind`: `0x20` window, `0x40` sliding, `0x50` door, matching Tydom's
   `windowFrench` / `windowSliding` / door device types. On the door, byte 8 bit
   `0x01` and byte 14 `0x04` are not understood yet (see the activation notes
   below, they may be a test mode).
-- Not captured yet: a tilt-and-turn window with the handle horizontal (turn
-  position, Tydom's `OPEN_FRENCH`). If it also sets `0x08`, the tilt sensor
-  would be wrong on those windows. Captures welcome.
 - Each event is sent 3 times ~20 ms apart, then the same burst again
   ~3.5-5.3 s later. Both are dropped by message number for 30 s.
-- Values in bytes 8-14 that don't match the table (possibly battery low or
+- Values in bytes 8-14 that don't match the table (possibly battery low,
   tamper) are logged at WARN level with the raw frame, once per device and
   pattern (repeats at DEBUG). Please report them.
-- **Activation and announce frames** (observed, not documented anywhere we
-  found: the repo's [X3D-Protocol.md](../X3D-Protocol.md) only covers Tydom
-  pairing messages, and Delta Dore / K•LINE describe pairing through the Tydom
-  app). Passing a strong magnet in front of a DVI a few times wakes it up:
-  - it sends an **announce** frame: a sensor message with a 16-byte header,
-    flags `0x00` (no "no response required" bit, so it probably expects an
-    answer, e.g. from a Tydom in pairing mode) and state byte `0x80`:
-    ```
-    16 ff 00 00 10 02 a0 ef 00 80 82 01 01 40 00 00 1e 3f fc ce 24 e5
-    ```
-    It is logged as `announce` and never changes the entities.
+- **Power-on frames** (observed, not documented anywhere we found: the
+  repo's [X3D-Protocol.md](../X3D-Protocol.md) only covers Tydom pairing
+  messages, and Delta Dore / K•LINE describe pairing through the Tydom app).
+  When a DVI starts (batteries inserted, a strong magnet passed a few times in
+  front of it, or a reset from a low supply) it sends a sensor message with a
+  16-byte header (13 normally), message number `0x00` and flags `0x00` (no "no
+  response required" bit, so it probably expects an answer, e.g. from a Tydom
+  in pairing mode). Bytes 8-17 are `flags state 82 0x 0x kind 00 00 mm mm`:
+  the kind is one byte later than usual, and `mm mm` is the encrypted X3D
+  message id (decrypted with the algorithm from
+  [psolyca/X2D-X3D](https://github.com/psolyca/X2D-X3D), it gives 2 on both
+  devices seen). Normal frames carry `00 00` there instead. The state byte is
+  either a real state or `0x80` (no handle position yet), which never changes
+  the entities. The same message number is repeated a few seconds later as a
+  normal 13-byte frame:
+  ```
+  16 ff 00 00 10 02 a0 ef 00 80 82 01 01 40 00 00 1e 3f fc ce 24 e5   no position, sliding
+  16 ff 00 00 10 a1 56 ef 00 11 82 00 00 20 00 00 c6 79 fc 28 26 49   locked (+ 0x10), window
+  ```
   - a door sent its state about once per second, with a new message number
     each time, for at least 10 s (instead of the usual 3 + 3 repeats).
 
-  Raw captures: [`tests/unsupported_frames.txt`](tests/unsupported_frames.txt).
+  Raw captures: [`tests/unsupported_frames.txt`](tests/unsupported_frames.txt),
+  [`more logs.txt`](more%20logs.txt).
 - **Door DVI calibration.** Doors use a different DVI (no reed switch, no
   magnet). Per the K•LINE POD installation manual (page 9), a door DVI must be
   recalibrated as soon as it has been removed from the frame (*dormant*): put
